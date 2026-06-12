@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "echo 'No build needed for static portal'",
-  "outputDirectory": "packages/backend/src/portal",
-  "cleanUrls": true
+  "buildCommand": "mkdir -p public && cp -R packages/backend/src/portal/* public/",
+  "outputDirectory": "public",
+  "framework": null
 }

@@ -3,7 +3,12 @@
  * Handles Auth, Developer Earnings, Advertiser Campaigns, and Live Queue
  */
 
-const API = window.location.origin;
+// Check if we are running locally (development)
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+// Placeholder for the future Railway/Fly backend URL
+const PROD_API_URL = 'https://api.hitback.dev'; 
+const API = isLocal ? 'http://localhost:3001' : PROD_API_URL;
+
 let currentUser = null;
 let selectedTierIndex = 0;
 let tiers = [];

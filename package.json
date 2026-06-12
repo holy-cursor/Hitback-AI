@@ -1,0 +1,15 @@
+{
+  "name": "hitback",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Wait State Ad Network — Cursor-first VS Code extension + backend",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "build:extension": "npm run compile --workspace=packages/extension",
+    "build:backend": "npm run build --workspace=packages/backend",
+    "build": "npm run build:extension && npm run build:backend"
+  }
+}

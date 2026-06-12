@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HitBack — Get Paid For Waiting</title>
+  <meta name="description" content="Turn AI code wait-states into ad real estate. Earn 70% of the revenue.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <div class="nav-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          <line x1="9" y1="10" x2="15" y2="10"/>
+        </svg>
+        <span>HitBack</span>
+      </div>
+      <div class="nav-links">
+        <a href="#advertisers" class="nav-link">For Advertisers</a>
+        <div id="auth-section">
+          <button class="btn btn-secondary btn-sm" onclick="handleLogin()">Sign In</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <!-- DEVELOPER SECTION -->
+    <section class="section-hero">
+      <h1 class="hero-title">Get paid for waiting.</h1>
+      <p class="hero-subtitle">
+        We turned AI code wait-states into ad real estate.<br>
+        <span class="highlight-green">70% of the revenue</span> goes to you.
+      </p>
+
+      <!-- Developer Dashboard UI (Hidden if not logged in / State handled by JS) -->
+      <div id="dev-dashboard" class="dev-dashboard-panel" style="display: none;">
+        
+        <div class="card dark-card">
+          <div class="card-header">
+            <span class="label">STRIPE CONNECT ID</span>
+            <span id="dev-stripe-status" class="status-badge status-warning">Not Connected</span>
+          </div>
+          <div class="card-body">
+            <button id="stripe-connect-btn" class="btn btn-dark-action" onclick="handleConnectOnboard()">
+              Connect Stripe to receive payouts
+            </button>
+          </div>
+        </div>
+
+        <div class="card dark-card">
+          <div class="card-header">
+            <span class="label">AVAILABLE BALANCE</span>
+            <span id="dev-balance" class="balance-text">$0.00</span>
+          </div>
+          <div class="card-body balance-row">
+            <span class="balance-sub">$10.00 minimum to withdraw</span>
+            <button id="withdraw-btn" class="btn btn-dark-action" onclick="handleWithdraw()" disabled>Withdraw</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Logged out prompt for developers -->
+      <div id="dev-logged-out" class="card info-card">
+        <p>Sign in to connect your Stripe account and start earning revenue share.</p>
+        <button class="btn btn-outline" onclick="handleLogin()">Sign In as Developer</button>
+      </div>
+
+      <div class="install-block">
+        <a href="vscode:extension/hitback.hitback" class="btn btn-primary btn-large btn-install">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="8 17 12 21 16 17"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
+          </svg>
+          Install the VS Code extension
+        </a>
+      </div>
+
+      <div class="links-block">
+        <a href="#" class="text-link">Read the documentation &rarr;</a>
+        <a href="#" class="text-link">View the GitHub repo &rarr;</a>
+      </div>
+    </section>
+
+    <!-- SCROLL ARROW -->
+    <div class="scroll-indicator">
+      <a href="#advertisers">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </a>
+    </div>
+
+    <!-- ADVERTISER SECTION -->
+    <section id="advertisers" class="section-advertisers">
+      <div class="advertiser-header">
+        <span class="section-label text-blue">ADVERTISERS</span>
+        <h2 class="section-title">Bid live for the most-watched spinner on Earth.</h2>
+        <p class="section-desc">
+          Reach developers exactly when they have 10-15 seconds of forced downtime.
+          The HitBack extension forces focus on your ad while their AI agent writes code.
+          You pay for blocks of impressions. No subscription, cancel anytime.
+        </p>
+      </div>
+
+      <div class="card form-card">
+        <form id="campaign-form" onsubmit="handleCreateCampaign(event)">
+          
+          <div class="form-group">
+            <label class="form-label" for="ad-text">AD TEXT (Max 60 chars)</label>
+            <input type="text" id="ad-text" name="adText" class="form-input" placeholder="Try our developer tool — 50% off today" maxlength="60" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ad-url">DESTINATION URL</label>
+            <input type="url" id="ad-url" name="adUrl" class="form-input" placeholder="https://your-product.com" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="cpc-bid">CPC BID (cents)</label>
+            <input type="number" id="cpc-bid" name="cpcBidCents" class="form-input" value="5" min="1" required>
+            <div class="form-hint">Higher bids get priority placement in the queue.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">IMPRESSION BLOCK</label>
+            <div class="tier-grid" id="tier-grid">
+              <!-- JS Populated -->
+            </div>
+          </div>
+
+          <!-- Active Campaigns logic (shown if user has active campaigns) -->
+          <div id="advertiser-campaigns" class="active-campaigns-block" style="display: none;">
+            <div class="divider"></div>
+            <label class="form-label">YOUR ACTIVE CAMPAIGNS</label>
+            <div id="campaigns-list" class="campaigns-list"></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="checkout-btn" class="btn btn-blue btn-full">
+              Checkout securely with Stripe
+            </button>
+            <p id="checkout-login-hint" class="form-hint text-center" style="margin-top: 8px;">
+              You will be asked to sign in before checking out.
+            </p>
+          </div>
+          
+          <div id="form-error" class="form-error" style="display: none;"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- LIVE MARKET SECTION -->
+    <section class="section-market">
+      <div class="market-header">
+        <span class="section-label text-blue">LIVE BID MARKET</span>
+      </div>
+      <div class="card market-card">
+        <div id="queue-list" class="queue-list">
+          <div class="queue-empty">Loading market data...</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container text-center">
+      <p>&copy; 2026 HitBack. <a href="#">Privacy</a> &middot; <a href="#">Terms</a></p>
+    </div>
+  </footer>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

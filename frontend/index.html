@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260613">
 </head>
 <body>
   <!-- Navigation -->
@@ -178,7 +178,19 @@
 
           <div class="form-group">
             <label class="form-label" for="ad-text">Ad headline <span class="required">*</span> <span class="label-hint">(max 60 chars)</span></label>
-            <textarea id="ad-text" name="adText" class="form-input form-textarea" rows="2" placeholder="e.g. Get paid for your content — join Content Rewards" maxlength="60" required oninput="updateAdPreview()"></textarea>
+            <div class="headline-field-wrap">
+              <input
+                type="text"
+                id="ad-text"
+                name="adText"
+                class="headline-input"
+                placeholder="e.g. Get paid for your content — join Content Rewards"
+                maxlength="60"
+                required
+                oninput="updateAdPreview()"
+                autocomplete="off"
+              >
+            </div>
             <div class="form-hint"><span id="ad-text-count">0</span>/60 characters — shown as the main line in the editor ad panel.</div>
           </div>
 

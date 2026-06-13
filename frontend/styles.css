@@ -322,6 +322,39 @@ body::after {
   border-bottom: 1px solid #e2e8f0;
 }
 
+/* Headline field — isolated from glass .form-input (textarea/input was collapsing) */
+.headline-field-wrap {
+  border: 2px solid #94a3b8;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.headline-input,
+input#ad-text.headline-input {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.4;
+  color: #0f172a;
+  background: #fff;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  -webkit-text-fill-color: #0f172a;
+  appearance: auto;
+  -webkit-appearance: none;
+}
+.headline-field-wrap:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.headline-input::placeholder {
+  color: #94a3b8;
+}
+
 /* Tier Grid */
 .tier-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .tier-option {

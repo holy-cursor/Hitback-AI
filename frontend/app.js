@@ -649,7 +649,7 @@ function updateAdPreview() {
   const imageUrl = document.getElementById("ad-image-url")?.value?.trim() || "";
   const countEl = document.getElementById("ad-text-count");
 
-  if (countEl && textEl) countEl.textContent = String(textEl.value.length);
+  if (countEl && textEl) countEl.textContent = String((textEl.value || "").length);
 
   if (!preview || !previewText) return;
 

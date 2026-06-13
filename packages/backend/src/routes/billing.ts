@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/requireAuth";
 import { isStripeConfigured, getStripe, IMPRESSION_TIERS } from "../lib/stripe";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
+import { getPortalUrl } from "../lib/portalUrl";
 
 const router = Router();
 
@@ -49,7 +50,7 @@ router.post("/checkout", requireAuth, async (req: Request, res: Response) => {
 
   try {
     const stripe = getStripe();
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001/portal";
+    const portalUrl = getPortalUrl();
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -72,8 +73,8 @@ router.post("/checkout", requireAuth, async (req: Request, res: Response) => {
         impressions: tier.impressions.toString(),
         userId: req.user?.id || "",
       },
-      success_url: `${frontendUrl}/dashboard.html?checkout=success&campaign=${campaignId}`,
-      cancel_url: `${frontendUrl}/dashboard.html?checkout=cancelled`,
+      success_url: `${portalUrl}/index.html?checkout=success&campaign=${campaignId}`,
+      cancel_url: `${portalUrl}/index.html?checkout=cancelled`,
     });
 
     console.log(
@@ -116,7 +117,7 @@ router.get("/portal", requireAuth, async (req: Request, res: Response) => {
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${process.env.FRONTEND_URL || "http://localhost:3001/portal"}/dashboard.html`,
+      return_url: `${getPortalUrl()}/index.html`,
     });
 
     res.json({ portalUrl: portalSession.url });

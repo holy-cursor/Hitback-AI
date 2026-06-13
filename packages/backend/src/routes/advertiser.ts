@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { DEFAULT_CPM_CENTS } from "../lib/cpm";
 import { requireAuth } from "../middleware/requireAuth";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
 
@@ -19,6 +20,7 @@ router.get("/campaigns", requireAuth, async (req: Request, res: Response) => {
           ad_url: "https://example.com/acme-pro",
           total_impressions: 5000,
           remaining_impressions: 3200,
+          cpm_cents: 800,
           status: "active",
           created_at: new Date().toISOString(),
         },
@@ -54,10 +56,10 @@ router.get("/campaigns", requireAuth, async (req: Request, res: Response) => {
  * POST /api/advertiser/campaigns
  * Creates a new campaign (draft status, pending checkout).
  *
- * Body: { adText: string, adUrl: string, cpcBidCents?: number }
+ * Body: { adText: string, adUrl: string, cpmCents?: number }
  */
 router.post("/campaigns", requireAuth, async (req: Request, res: Response) => {
-  const { adText, adUrl, cpcBidCents } = req.body;
+  const { adText, adUrl, cpmCents } = req.body;
 
   if (!adText || typeof adText !== "string" || adText.length > 60) {
     res.status(400).json({ error: "adText is required and must be ≤60 characters" });
@@ -101,7 +103,7 @@ router.post("/campaigns", requireAuth, async (req: Request, res: Response) => {
         advertiser_id: req.user!.id,
         ad_text: adText,
         ad_url: adUrl,
-        cpc_bid_cents: cpcBidCents || 5,
+        cpm_cents: cpmCents || DEFAULT_CPM_CENTS,
         status: "draft",
       })
       .select()

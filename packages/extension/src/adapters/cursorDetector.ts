@@ -1,6 +1,5 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { agentLog } from "../debugLog";
 
 /**
  * Detects agent activity using EVERY available signal.
@@ -30,38 +29,11 @@ export class CursorAgentDetector implements vscode.Disposable {
     private readonly ignoredDocSchemes: Set<string> = new Set()
   ) {
     console.log("[HitBack:Detector] Initialized — ALL signals active");
-    // #region agent log
-    agentLog(
-      "cursorDetector.ts:constructor",
-      "Detector initialized",
-      {
-        workspaceFolders:
-          vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath) ?? [],
-        initialWatchRoots: this.initialWatchRoots,
-      },
-      "A",
-      "post-fix-v2"
-    );
-    // #endregion
 
     // ── Signal 1: Text document changes (typing & agent edits) ──
     this.disposables.push(
       vscode.workspace.onDidChangeTextDocument((e) => {
         const { scheme, fsPath } = e.document.uri;
-        // #region agent log
-        agentLog(
-          "cursorDetector.ts:onDidChangeTextDocument",
-          "Text doc change raw",
-          {
-            scheme,
-            fsPath,
-            contentChangesLen: e.contentChanges.length,
-            reason: e.reason,
-          },
-          "B",
-          "post-fix-v2"
-        );
-        // #endregion
         if (!this.ignoredDocSchemes.has(scheme)) {
           this.handleEvent(`doc-edit: ${this.label(e.document.uri)}`);
         }
@@ -145,15 +117,6 @@ export class CursorAgentDetector implements vscode.Disposable {
     );
 
     watcher.onDidChange((uri) => {
-      // #region agent log
-      agentLog(
-        "cursorDetector.ts:fsWatcher",
-        "FS watcher change",
-        { fsPath: uri.fsPath, watchRoot: resolved },
-        "C",
-        "post-fix-v2"
-      );
-      // #endregion
       this.handleEvent(`fs-change: ${this.label(uri)}`);
     });
     watcher.onDidCreate((uri) =>
@@ -164,15 +127,6 @@ export class CursorAgentDetector implements vscode.Disposable {
     );
 
     this.fileWatchers.push(watcher);
-    // #region agent log
-    agentLog(
-      "cursorDetector.ts:addWatchRoot",
-      "FS watcher added",
-      { watchRoot: resolved, totalWatchers: this.fileWatchers.length },
-      "C",
-      "post-fix-v2"
-    );
-    // #endregion
   }
 
   private handleEvent(label: string): void {
@@ -184,15 +138,6 @@ export class CursorAgentDetector implements vscode.Disposable {
       label.includes("/out/") ||
       label.includes("\\dist\\") ||
       label.includes("/dist/");
-    // #region agent log
-    agentLog(
-      "cursorDetector.ts:handleEvent",
-      "handleEvent called",
-      { label, filtered, agentActive: this.agentActive },
-      "D",
-      "post-fix-v2"
-    );
-    // #endregion
     if (filtered) {
       return;
     }
@@ -203,15 +148,6 @@ export class CursorAgentDetector implements vscode.Disposable {
       this.agentActive = true;
       this.eventCount = 1;
       console.log(`[HitBack] 🚀 ${label} — SHOWING AD`);
-      // #region agent log
-      agentLog(
-        "cursorDetector.ts:onAgentStart.fire",
-        "Firing onAgentStart",
-        { label },
-        "D",
-        "post-fix-v2"
-      );
-      // #endregion
       this._onAgentStart.fire();
     } else if (this.eventCount % 10 === 0) {
       console.log(`[HitBack] ...${this.eventCount} events (ad still showing)`);

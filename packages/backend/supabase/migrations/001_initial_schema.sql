@@ -17,8 +17,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   ad_url        TEXT NOT NULL,
   total_impressions   INT NOT NULL DEFAULT 0,
   remaining_impressions INT NOT NULL DEFAULT 0,
-  cpc_bid_cents INT NOT NULL DEFAULT 5,  -- cost per click in cents
-  cpi_cents     INT NOT NULL DEFAULT 1,  -- cost per impression in cents
+  cpm_cents     INT NOT NULL DEFAULT 1000, -- CPM rate in cents per 1,000 impressions ($10.00 CPM)
   status        TEXT NOT NULL DEFAULT 'draft'
                 CHECK (status IN ('draft', 'active', 'paused', 'exhausted')),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -27,6 +26,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
 
 CREATE INDEX idx_campaigns_status ON campaigns (status);
 CREATE INDEX idx_campaigns_advertiser ON campaigns (advertiser_id);
+CREATE INDEX idx_campaigns_cpm ON campaigns (cpm_cents DESC);
 
 -- -----------------------------------------------------------
 -- IMPRESSIONS

@@ -3,11 +3,10 @@
  * Handles Auth, Developer Earnings, Advertiser Campaigns, and Live Queue
  */
 
-// Check if we are running locally (development)
+// Local dev hits localhost; production uses same host (Fly) or meta tag (split frontend).
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-// Placeholder for the future Railway/Fly backend URL
-const PROD_API_URL = 'https://api.hitback.dev'; 
-const API = isLocal ? 'http://localhost:3001' : PROD_API_URL;
+const configuredApi = document.querySelector('meta[name="hitback-api"]')?.getAttribute('content');
+const API = isLocal ? 'http://localhost:3001' : (configuredApi || window.location.origin);
 
 let currentUser = null;
 let selectedTierIndex = 0;
@@ -64,66 +63,108 @@ function setupLoggedInState() {
     `;
   }
 
-  // Show Dev Dashboard, hide Logged Out prompt
-  document.getElementById("dev-dashboard").style.display = "flex";
+  document.getElementById("dev-logged-in-teaser").style.display = "block";
   document.getElementById("dev-logged-out").style.display = "none";
+  document.getElementById("earnings-logged-out").style.display = "none";
+  document.getElementById("earnings-dashboard").style.display = "block";
   document.getElementById("checkout-login-hint").style.display = "none";
 
-  loadDevBalance();
+  loadDevDashboard();
   loadActiveCampaigns();
 }
 
 function setupLoggedOutState() {
-  document.getElementById("dev-dashboard").style.display = "none";
+  document.getElementById("dev-logged-in-teaser").style.display = "none";
   document.getElementById("dev-logged-out").style.display = "block";
+  document.getElementById("earnings-logged-out").style.display = "block";
+  document.getElementById("earnings-dashboard").style.display = "none";
   document.getElementById("checkout-login-hint").style.display = "block";
   document.getElementById("advertiser-campaigns").style.display = "none";
 }
 
-// ── Developer Dashboard ──────────────────────────────────────
+// ── Developer Earnings Portal ────────────────────────────────
 
-async function loadDevBalance() {
-  const amountEl = document.getElementById("dev-balance");
+async function loadDevDashboard() {
+  const balanceEl = document.getElementById("earnings-balance");
+  const monthEl = document.getElementById("stat-month");
+  const impressionsEl = document.getElementById("stat-impressions");
+  const lifetimeEl = document.getElementById("stat-lifetime");
+  const historyEl = document.getElementById("earnings-history");
   const withdrawBtn = document.getElementById("withdraw-btn");
   const statusEl = document.getElementById("dev-stripe-status");
   const connectBtn = document.getElementById("stripe-connect-btn");
 
   try {
-    const res = await fetch(`${API}/api/payouts/balance`, { credentials: "include" });
-    if (res.ok) {
-      const data = await res.json();
-      if (amountEl) amountEl.textContent = data.balanceDisplay || "$0.00";
-      if (withdrawBtn) withdrawBtn.disabled = !data.canWithdraw;
-      
-      // In a real app we'd check if they have a Stripe Connect ID from profile
-      // For now, assume if balance loads, they are connected (or just show connect button)
-      if (statusEl) {
-        statusEl.textContent = "Connected";
-        statusEl.className = "status-badge status-success";
-      }
-      if (connectBtn) connectBtn.style.display = "none";
-    } else {
-      // Demo Mode
-      showDemoBalance();
+    const res = await fetch(`${API}/api/payouts/dashboard`, { credentials: "include" });
+    if (!res.ok) {
+      renderEmptyDashboard();
+      return;
     }
+
+    const data = await res.json();
+
+    if (balanceEl) balanceEl.textContent = data.balanceDisplay || "$0.00";
+    if (monthEl) monthEl.textContent = data.monthEarningsDisplay || "$0.00";
+    if (impressionsEl) impressionsEl.textContent = (data.totalImpressions || 0).toLocaleString();
+    if (lifetimeEl) lifetimeEl.textContent = data.lifetimeEarningsDisplay || "$0.00";
+    if (withdrawBtn) withdrawBtn.disabled = !data.canWithdraw;
+
+    if (statusEl) {
+      if (data.stripeConnected) {
+        statusEl.textContent = "Stripe Connected";
+        statusEl.className = "status-badge status-success";
+        if (connectBtn) connectBtn.style.display = "none";
+      } else {
+        statusEl.textContent = "Not Connected";
+        statusEl.className = "status-badge status-warning";
+        if (connectBtn) connectBtn.style.display = "inline-flex";
+      }
+    }
+
+    renderEarningsHistory(data.recentEarnings || [], historyEl);
   } catch {
-    showDemoBalance();
+    renderEmptyDashboard();
   }
 }
 
-function showDemoBalance() {
-  const amountEl = document.getElementById("dev-balance");
-  if (amountEl) amountEl.textContent = "$12.47";
-  const withdrawBtn = document.getElementById("withdraw-btn");
-  if (withdrawBtn) withdrawBtn.disabled = false;
-  
-  const statusEl = document.getElementById("dev-stripe-status");
-  if (statusEl) {
-    statusEl.textContent = "Demo Account";
-    statusEl.className = "status-badge status-success";
+function renderEmptyDashboard() {
+  const balanceEl = document.getElementById("earnings-balance");
+  if (balanceEl) balanceEl.textContent = "$0.00";
+  const monthEl = document.getElementById("stat-month");
+  if (monthEl) monthEl.textContent = "$0.00";
+  const impressionsEl = document.getElementById("stat-impressions");
+  if (impressionsEl) impressionsEl.textContent = "0";
+  const lifetimeEl = document.getElementById("stat-lifetime");
+  if (lifetimeEl) lifetimeEl.textContent = "$0.00";
+  const historyEl = document.getElementById("earnings-history");
+  if (historyEl) {
+    historyEl.innerHTML = `<div class="earnings-empty">Unable to load earnings. Is the backend running?</div>`;
   }
-  const connectBtn = document.getElementById("stripe-connect-btn");
-  if (connectBtn) connectBtn.style.display = "none";
+}
+
+function renderEarningsHistory(entries, container) {
+  if (!container) return;
+
+  if (!entries.length) {
+    container.innerHTML = `<div class="earnings-empty">No earnings yet. Install the extension and run your AI agent to start earning.</div>`;
+    return;
+  }
+
+  container.innerHTML = entries.map((e) => {
+    const date = new Date(e.createdAt).toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+    const source = e.source === "impression" ? "Impression" : "Click";
+    return `
+      <div class="earnings-row">
+        <div class="earnings-row-left">
+          <span class="earnings-row-amount">${escapeHtml(e.amountDisplay)}</span>
+          <span class="earnings-row-source">${source}</span>
+        </div>
+        <span class="earnings-row-date">${escapeHtml(date)}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 async function handleConnectOnboard() {
@@ -148,7 +189,7 @@ async function handleWithdraw() {
     if (res.ok) {
       const data = await res.json();
       showToast(`Withdrawn ${data.amountDisplay} to Stripe!`, "success");
-      await loadDevBalance();
+      await loadDevDashboard();
     } else {
       const data = await res.json();
       showToast(data.error || "Withdrawal failed", "error");
@@ -245,7 +286,7 @@ async function handleCreateCampaign(e) {
 
   const adText = form.adText.value.trim();
   const adUrl = form.adUrl.value.trim();
-  const cpcBidCents = parseInt(form.cpcBidCents.value) || 5;
+  const cpmCents = parseInt(form.cpmCents.value) || 1000;
 
   if (!adText || !adUrl) return;
 
@@ -259,7 +300,7 @@ async function handleCreateCampaign(e) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ adText, adUrl, cpcBidCents }),
+      body: JSON.stringify({ adText, adUrl, cpmCents }),
     });
 
     const data = await res.json();
@@ -300,10 +341,10 @@ async function handleCreateCampaign(e) {
 function saveFormState() {
   const adText = document.getElementById("ad-text")?.value;
   const adUrl = document.getElementById("ad-url")?.value;
-  const cpcBidCents = document.getElementById("cpc-bid")?.value;
+  const cpmCents = document.getElementById("cpm-rate")?.value;
   if (adText || adUrl) {
     sessionStorage.setItem("pendingCheckout", JSON.stringify({
-      adText, adUrl, cpcBidCents, tierIndex: selectedTierIndex
+      adText, adUrl, cpmCents, tierIndex: selectedTierIndex
     }));
   }
 }
@@ -315,11 +356,11 @@ function checkPendingCheckout() {
       const data = JSON.parse(pending);
       const adTextEl = document.getElementById("ad-text");
       const adUrlEl = document.getElementById("ad-url");
-      const cpcBidEl = document.getElementById("cpc-bid");
+      const cpmEl = document.getElementById("cpm-rate");
       
       if (adTextEl) adTextEl.value = data.adText || "";
       if (adUrlEl) adUrlEl.value = data.adUrl || "";
-      if (cpcBidEl) cpcBidEl.value = data.cpcBidCents || "5";
+      if (cpmEl) cpmEl.value = data.cpmCents || "1000";
       if (data.tierIndex !== undefined) selectedTierIndex = data.tierIndex;
       
     } catch (e) {}
@@ -342,11 +383,11 @@ function renderQueue(campaigns) {
 
   const active = (campaigns || [])
     .filter(c => c.status === "active" && (c.remaining_impressions || 0) > 0)
-    .sort((a, b) => (b.cpc_bid_cents || 0) - (a.cpc_bid_cents || 0))
+    .sort((a, b) => (b.cpm_cents || 0) - (a.cpm_cents || 0))
     .slice(0, 5); // top 5
 
   if (active.length === 0) {
-    queueEl.innerHTML = `<div class="queue-empty">No active bids. Be the first!</div>`;
+    queueEl.innerHTML = `<div class="queue-empty">No active campaigns. Be the first!</div>`;
     return;
   }
 
@@ -357,7 +398,7 @@ function renderQueue(campaigns) {
         <span class="q-text">${escapeHtml(c.ad_text)}</span>
       </div>
       <div class="q-right">
-        <span class="q-bid">$${((c.cpc_bid_cents || 0) / 100).toFixed(2)} CPC</span>
+        <span class="q-bid">$${((c.cpm_cents || 0) / 100).toFixed(2)} CPM</span>
         <span class="q-rem">${(c.remaining_impressions || 0).toLocaleString()} left</span>
       </div>
     </div>
@@ -367,8 +408,7 @@ function renderQueue(campaigns) {
 let queueInterval;
 async function fetchQueue() {
   try {
-    const res = await fetch(`${API}/api/advertiser/campaigns`); // Requires public endpoint, but wait!
-    // /api/advertiser/campaigns requires auth. Let's just mock it if it fails or fetch authenticated.
+    const res = await fetch(`${API}/api/ads/queue`);
     if (res.ok) {
       const data = await res.json();
       renderQueue(data.campaigns || []);
@@ -382,9 +422,9 @@ async function fetchQueue() {
 
 function showDemoQueue() {
   const demoCampaigns = [
-    { ad_text: "Try Acme Pro — 50% off today", cpc_bid_cents: 8, remaining_impressions: 4200, status: 'active' },
-    { ad_text: "Ship faster with Turbo CI/CD", cpc_bid_cents: 5, remaining_impressions: 1100, status: 'active' },
-    { ad_text: "DevTools Premium — free trial", cpc_bid_cents: 4, remaining_impressions: 8900, status: 'active' }
+    { ad_text: "Try Acme Pro — 50% off today", cpm_cents: 800, remaining_impressions: 4200, status: 'active' },
+    { ad_text: "Ship faster with Turbo CI/CD", cpm_cents: 500, remaining_impressions: 1100, status: 'active' },
+    { ad_text: "DevTools Premium — free trial", cpm_cents: 400, remaining_impressions: 8900, status: 'active' }
   ];
   renderQueue(demoCampaigns);
 }

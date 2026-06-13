@@ -33,7 +33,7 @@ let adIndex = 0;
  * Returns the current highest-priority active ad.
  *
  * When Supabase is configured: queries for the active campaign with the
- * highest CPC bid and remaining impressions.
+ * highest CPM and remaining impressions.
  * Fallback: round-robins through hardcoded demo ads.
  */
 router.get("/current", async (_req: Request, res: Response) => {
@@ -42,13 +42,12 @@ router.get("/current", async (_req: Request, res: Response) => {
     try {
       const sb = getSupabase();
 
-      // Get the active campaign with the highest bid and remaining impressions
       const { data: campaign, error } = await sb
         .from("campaigns")
-        .select("id, ad_text, ad_url, cpc_bid_cents, remaining_impressions")
+        .select("id, ad_text, ad_url, cpm_cents, remaining_impressions")
         .eq("status", "active")
         .gt("remaining_impressions", 0)
-        .order("cpc_bid_cents", { ascending: false })
+        .order("cpm_cents", { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -57,7 +56,7 @@ router.get("/current", async (_req: Request, res: Response) => {
         // Fall through to demo mode
       } else if (campaign) {
         console.log(
-          `[Ads] Served campaign: "${campaign.ad_text}" (id: ${campaign.id}, remaining: ${campaign.remaining_impressions})`
+          `[Ads] Served campaign: "${campaign.ad_text}" (id: ${campaign.id}, CPM: ${campaign.cpm_cents}¢, remaining: ${campaign.remaining_impressions})`
         );
 
         res.json({
@@ -86,6 +85,40 @@ router.get("/current", async (_req: Request, res: Response) => {
     text: ad.text,
     url: ad.url,
   });
+});
+
+/**
+ * GET /api/ads/queue
+ * Public endpoint: top active campaigns by CPM for the live queue display.
+ */
+router.get("/queue", async (_req: Request, res: Response) => {
+  if (!isSupabaseConfigured()) {
+    res.json({ campaigns: [] });
+    return;
+  }
+
+  try {
+    const sb = getSupabase();
+
+    const { data: campaigns, error } = await sb
+      .from("campaigns")
+      .select("ad_text, cpm_cents, remaining_impressions, status")
+      .eq("status", "active")
+      .gt("remaining_impressions", 0)
+      .order("cpm_cents", { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error("[Ads] Queue query error:", error.message);
+      res.status(500).json({ error: "Failed to fetch queue" });
+      return;
+    }
+
+    res.json({ campaigns: campaigns || [] });
+  } catch (err) {
+    console.error("[Ads] Queue error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

@@ -23,6 +23,14 @@
       {
         "command": "hitback.testAd",
         "title": "HitBack: Test Ad (Debug)"
+      },
+      {
+        "command": "hitback.login",
+        "title": "HitBack: Login"
+      },
+      {
+        "command": "hitback.logout",
+        "title": "HitBack: Logout"
       }
     ],
     "configuration": {

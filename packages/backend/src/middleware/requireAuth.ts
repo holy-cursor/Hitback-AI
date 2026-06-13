@@ -1,13 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
+import { extractAuthToken } from "../lib/resolveUser";
 
-/**
- * Express middleware that validates the Supabase JWT from the session cookie.
- * Attaches `req.user` with `{ id, email, role }` for downstream routes.
- * Returns 401 for unauthenticated requests.
- */
-
-/** Augment Express Request with user info. */
 declare global {
   namespace Express {
     interface Request {
@@ -30,7 +24,7 @@ export async function requireAuth(
     return;
   }
 
-  const token = req.cookies?.hb_token;
+  const token = extractAuthToken(req);
 
   if (!token) {
     res.status(401).json({ error: "Authentication required" });
@@ -46,7 +40,6 @@ export async function requireAuth(
       return;
     }
 
-    // Fetch profile for role
     const { data: profile } = await sb
       .from("user_profiles")
       .select("role")
@@ -56,7 +49,7 @@ export async function requireAuth(
     req.user = {
       id: data.user.id,
       email: data.user.email || "",
-      role: profile?.role || "advertiser",
+      role: profile?.role || "developer",
     };
 
     next();

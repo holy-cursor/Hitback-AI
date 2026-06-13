@@ -19,14 +19,19 @@ export const OFFLINE_FALLBACK_AD: Ad = {
   url: "https://example.com/acme-pro",
 };
 
-export async function fetchCurrentAd(backendUrl: string): Promise<Ad | null> {
+export async function fetchCurrentAd(backendUrl: string, token?: string): Promise<Ad | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    const headers: Record<string, string> = { "Accept": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${backendUrl}/api/ads/current`, {
       signal: controller.signal,
-      headers: { "Accept": "application/json" },
+      headers,
     });
 
     clearTimeout(timeout);
@@ -54,16 +59,22 @@ export async function fetchCurrentAd(backendUrl: string): Promise<Ad | null> {
 export async function reportImpression(
   backendUrl: string,
   campaignId: string,
-  extensionUserId: string
+  extensionUserId: string,
+  token?: string
 ): Promise<void> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     await fetch(`${backendUrl}/api/impressions`, {
       method: "POST",
       signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ campaignId, extensionUserId }),
     });
 
@@ -80,16 +91,22 @@ export async function reportImpression(
 export async function reportClick(
   backendUrl: string,
   adId: string,
-  extensionUserId?: string
+  extensionUserId?: string,
+  token?: string
 ): Promise<void> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     await fetch(`${backendUrl}/api/clicks`, {
       method: "POST",
       signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ adId, extensionUserId }),
     });
 

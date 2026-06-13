@@ -4,3 +4,7 @@ out/
 .env
 *.vsix
 .vscode-test/
+.cursor/
+debug*.log
+*.log
+!.dockerignore

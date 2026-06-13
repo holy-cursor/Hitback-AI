@@ -5,12 +5,8 @@ const router = Router();
 
 /**
  * POST /api/clicks
- * Logs an ad click event.
+ * Logs an ad click event (analytics only — earnings are CPM-based on impressions).
  * Body: { adId: string, extensionUserId?: string }
- *
- * When Supabase is configured: writes to the clicks table and records
- * developer CPC earnings (70% revenue share).
- * Fallback: logs to console.
  */
 router.post("/", async (req: Request, res: Response) => {
   const { adId, extensionUserId } = req.body;
@@ -20,12 +16,10 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
-  // --- Supabase mode ---
   if (isSupabaseConfigured() && extensionUserId) {
     try {
       const sb = getSupabase();
 
-      // Record the click
       const { error: clickError } = await sb.from("clicks").insert({
         campaign_id: adId,
         extension_user_id: extensionUserId,
@@ -34,26 +28,6 @@ router.post("/", async (req: Request, res: Response) => {
       if (clickError) {
         console.error("[Clicks] Insert error:", clickError.message);
       } else {
-        // Fetch campaign CPC bid for earnings calculation
-        const { data: campaign } = await sb
-          .from("campaigns")
-          .select("cpc_bid_cents")
-          .eq("id", adId)
-          .single();
-
-        if (campaign) {
-          // Developer gets 70% of CPC
-          const devEarnings = Math.round(campaign.cpc_bid_cents * 0.7);
-          if (devEarnings > 0) {
-            await sb.from("earnings").insert({
-              developer_id: extensionUserId,
-              amount_cents: devEarnings,
-              source: "click",
-              campaign_id: adId,
-            });
-          }
-        }
-
         console.log(
           `[Clicks] Recorded: campaign=${adId} user=${extensionUserId}`
         );

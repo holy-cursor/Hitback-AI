@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Authenticating — HitBack</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -16,13 +18,7 @@
   <main class="login-container">
     <div class="login-card" style="padding: 48px 32px;">
       <div class="login-logo">
-        <div class="login-logo-icon">
-          <span class="logo-pulse"></span>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            <line x1="9" y1="10" x2="15" y2="10"/>
-          </svg>
-        </div>
+        <img src="favicon.png" alt="HitBack" class="site-logo site-logo--lg">
       </div>
       <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Authenticating…</h2>
       <p style="font-size: 13px; color: var(--text-muted);" id="status-text">Exchanging tokens with Supabase</p>
@@ -72,7 +68,7 @@
 
         if (res.ok) {
           statusEl.textContent = "Success! Redirecting…";
-          window.location.href = "dashboard.html";
+          window.location.href = "index.html";
         } else {
           statusEl.textContent = "Authentication failed. Redirecting…";
           setTimeout(() => { window.location.href = "index.html"; }, 2000);

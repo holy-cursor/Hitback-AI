@@ -1,4 +1,6 @@
 import { Router, Request, Response } from "express";
+import { devEarningsPerImpression } from "../lib/cpm";
+import { resolveAuthUserId } from "../lib/resolveUser";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
 
 const router = Router();
@@ -9,7 +11,7 @@ const router = Router();
  *
  * Body: { campaignId: string, extensionUserId: string }
  *
- * Also records developer earnings for the impression.
+ * Also records developer earnings for the impression (60% of CPM rate).
  */
 router.post("/", async (req: Request, res: Response) => {
   const { campaignId, extensionUserId } = req.body;
@@ -24,7 +26,6 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
-  // If Supabase is not configured, just log and return
   if (!isSupabaseConfigured()) {
     console.log(
       `[Impressions] (demo mode) Campaign ${campaignId} shown to ${extensionUserId}`
@@ -35,8 +36,30 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     const sb = getSupabase();
+    const authUserId = await resolveAuthUserId(req);
+    const developerId = authUserId ?? extensionUserId;
 
-    // Record the impression
+    // -- Anti-Spam Server-Side Rate Limit --
+    // Check how many impressions this user logged in the last hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count, error: countError } = await sb
+      .from("impressions")
+      .select("*", { count: "exact", head: true })
+      .eq("extension_user_id", extensionUserId)
+      .gte("shown_at", oneHourAgo);
+
+    if (countError) {
+      console.error("[Impressions] Rate limit check error:", countError.message);
+    }
+
+    // We set the server hard-limit slightly higher than the client (30 instead of 25)
+    // to account for clock drift and race conditions without punishing legitimate requests.
+    if (count !== null && count >= 30) {
+      console.warn(`[Impressions] FRAUD BLOCK: ${extensionUserId} exceeded 30 imp/hr.`);
+      res.status(429).json({ error: "Rate limit exceeded" });
+      return;
+    }
+
     const { error: impError } = await sb.from("impressions").insert({
       campaign_id: campaignId,
       extension_user_id: extensionUserId,
@@ -48,10 +71,9 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
-    // Decrement remaining impressions on the campaign
     const { data: campaign, error: fetchError } = await sb
       .from("campaigns")
-      .select("remaining_impressions, cpi_cents")
+      .select("remaining_impressions, cpm_cents")
       .eq("id", campaignId)
       .single();
 
@@ -61,18 +83,16 @@ router.post("/", async (req: Request, res: Response) => {
         remaining_impressions: newRemaining,
       };
 
-      // If impressions are exhausted, mark the campaign as exhausted
       if (newRemaining === 0) {
         updates.status = "exhausted";
       }
 
       await sb.from("campaigns").update(updates).eq("id", campaignId);
 
-      // Record developer earnings (revenue share: 70% of CPI goes to dev)
-      const devEarnings = Math.round(campaign.cpi_cents * 0.7);
+      const devEarnings = devEarningsPerImpression(campaign.cpm_cents);
       if (devEarnings > 0) {
         await sb.from("earnings").insert({
-          developer_id: extensionUserId,
+          developer_id: developerId,
           amount_cents: devEarnings,
           source: "impression",
           campaign_id: campaignId,
@@ -81,7 +101,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     console.log(
-      `[Impressions] Recorded: campaign=${campaignId} user=${extensionUserId}`
+      `[Impressions] Recorded: campaign=${campaignId} user=${extensionUserId} developer=${developerId}`
     );
     res.json({ success: true });
   } catch (err) {

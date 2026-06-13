@@ -8,8 +8,11 @@ import {
   reportClick,
   reportImpression,
 } from "./ads/adClient";
-import { initDebugLog, agentLog } from "./debugLog";
 import { randomUUID } from "crypto";
+
+import { AuthService } from "./auth/authService";
+
+import { RateLimiter } from "./ads/rateLimiter";
 
 /**
  * HitBack Extension — AI Wait State Ad Network
@@ -67,27 +70,20 @@ function collectWatchRoots(context: vscode.ExtensionContext): string[] {
   return [...roots];
 }
 
-export function activate(context: vscode.ExtensionContext): void {
-  initDebugLog(context.extensionPath);
-
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration("hitback");
   const enabled = config.get<boolean>("enabled", true);
   const watchRoots = collectWatchRoots(context);
 
-  // #region agent log
-  agentLog(
-    "extension.ts:activate",
-    "Extension activate called",
-    {
-      enabled,
-      workspaceFolders:
-        vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath) ?? [],
-      watchRoots,
-    },
-    "A",
-    "post-fix-v2"
-  );
-  // #endregion
+  // Initialize AuthService
+  const authService = AuthService.getInstance(context);
+  context.subscriptions.push(vscode.window.registerUriHandler(authService));
+  await authService.initialize();
+
+  // Register Auth Commands
+  const loginCommand = vscode.commands.registerCommand("hitback.login", () => authService.login());
+  const logoutCommand = vscode.commands.registerCommand("hitback.logout", () => authService.logout());
+  context.subscriptions.push(loginCommand, logoutCommand);
 
   if (!enabled) {
     return;
@@ -96,41 +92,34 @@ export function activate(context: vscode.ExtensionContext): void {
   const detector = new CursorAgentDetector(watchRoots, IGNORED_DOC_SCHEMES);
   const adPanel = new AdPanel();
   const extensionUserId = getOrCreateUserId(context);
+  const rateLimiter = RateLimiter.getInstance(context);
 
   // --- Agent Start: fetch and show an ad ---
   const startListener = detector.onAgentStart(async () => {
+    if (!rateLimiter.canShowAd()) {
+      console.log("[HitBack] Rate limit reached. Skipping ad fetch for this burst.");
+      return;
+    }
+
     const backendUrl = vscode.workspace
       .getConfiguration("hitback")
       .get<string>("backendUrl", "http://localhost:3001");
 
-    const fetchedAd = await fetchCurrentAd(backendUrl);
+    const token = authService.getToken() || undefined;
+    const fetchedAd = await fetchCurrentAd(backendUrl, token);
     const ad = fetchedAd ?? OFFLINE_FALLBACK_AD;
     const usedFallback = !fetchedAd;
 
-    // #region agent log
-    agentLog(
-      "extension.ts:onAgentStart",
-      "onAgentStart handler",
-      {
-        adFound: !!fetchedAd,
-        usedFallback,
-        adId: ad.id,
-        isActive: detector.isActive,
-        backendUrl,
-      },
-      "E",
-      "post-fix-v3"
-    );
-    // #endregion
-
     if (detector.isActive) {
       adPanel.show(ad);
+      rateLimiter.recordImpression();
+
       console.log(
         `[HitBack] Ad panel opened: "${ad.text}" (id: ${ad.id}${usedFallback ? ", offline fallback" : ""})`
       );
 
       if (!usedFallback) {
-        reportImpression(backendUrl, ad.id, extensionUserId);
+        reportImpression(backendUrl, ad.id, extensionUserId, token);
       }
     }
   });
@@ -154,7 +143,8 @@ export function activate(context: vscode.ExtensionContext): void {
         .getConfiguration("hitback")
         .get<string>("backendUrl", "http://localhost:3001");
 
-      reportClick(backendUrl, ad.id, extensionUserId);
+      const token = authService.getToken() || undefined;
+      reportClick(backendUrl, ad.id, extensionUserId, token);
     }
   );
 
@@ -166,17 +156,15 @@ export function activate(context: vscode.ExtensionContext): void {
         .getConfiguration("hitback")
         .get<string>("backendUrl", "http://localhost:3001");
 
-      const ad = await fetchCurrentAd(backendUrl);
-      console.log("[HitBack:Test] Fetch result:", ad);
+      const token = authService.getToken() || undefined;
+      const fetchedAd = await fetchCurrentAd(backendUrl, token);
+      const ad = fetchedAd ?? OFFLINE_FALLBACK_AD;
+      const usedFallback = !fetchedAd;
 
-      if (ad) {
-        adPanel.show(ad);
-        vscode.window.showInformationMessage(`[HitBack] Ad: "${ad.text}"`);
-      } else {
-        vscode.window.showErrorMessage(
-          "[HitBack] No ad returned. Is the backend running on " + backendUrl + "?"
-        );
-      }
+      adPanel.show(ad);
+      vscode.window.showInformationMessage(
+        `[HitBack] Ad: "${ad.text}"${usedFallback ? " (offline fallback)" : ""}`
+      );
     }
   );
 

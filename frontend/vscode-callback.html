@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VS Code Authentication — HitBack</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="login-page">
+  <main class="login-container" style="display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--bg-page);">
+    <div class="card" style="padding: 48px 32px; max-width: 400px; text-align: center;">
+      <img src="favicon.png" alt="HitBack" class="site-logo site-logo--lg" style="margin-bottom: 20px;">
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Authentication Successful!</h2>
+      <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;" id="status-text">
+        Redirecting you back to your editor...
+      </p>
+      
+      <div id="manual-action" style="display: none;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          If your browser doesn't automatically prompt you to open your editor, click the button below.
+        </p>
+        <button id="open-vscode-btn" class="btn btn-blue btn-full">
+          Open in Editor
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    /**
+     * VS Code OAuth Callback Handler
+     *
+     * Supabase redirects here with tokens in the URL hash.
+     * We extract the access token and trigger a VS Code deep link.
+     */
+    (function handleVSCodeCallback() {
+      const statusEl = document.getElementById("status-text");
+      const manualActionEl = document.getElementById("manual-action");
+      const openBtn = document.getElementById("open-vscode-btn");
+
+      try {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get("access_token");
+
+        if (!accessToken) {
+          statusEl.textContent = "Authentication failed. No token received.";
+          statusEl.style.color = "red";
+          return;
+        }
+
+        // Deep link for VS Code and Cursor (same extension ID)
+        const vscodeLink = `vscode://hitback.hitback-extension/auth-callback?token=${encodeURIComponent(accessToken)}`;
+        const cursorLink = `cursor://hitback.hitback-extension/auth-callback?token=${encodeURIComponent(accessToken)}`;
+
+        const preferredEditor = new URLSearchParams(window.location.search).get("editor");
+        const primaryLink = preferredEditor === "vscode" ? vscodeLink : cursorLink;
+        const fallbackLink = preferredEditor === "vscode" ? cursorLink : vscodeLink;
+
+        function openDeepLinks() {
+          window.location.href = primaryLink;
+          setTimeout(() => { window.location.href = fallbackLink; }, 600);
+        }
+
+        // Try preferred editor first, then the other (browsers can't detect scheme success)
+        openDeepLinks();
+
+        // Show manual button just in case the browser blocks automatic deep links
+        setTimeout(() => {
+          manualActionEl.style.display = "block";
+          statusEl.textContent = "You can safely close this browser tab.";
+        }, 1500);
+
+        openBtn.addEventListener("click", openDeepLinks);
+
+      } catch (err) {
+        statusEl.textContent = "An error occurred during authentication.";
+        console.error(err);
+      }
+    })();
+  </script>
+</body>
+</html>

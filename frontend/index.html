@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HitBack — Get Paid For Waiting</title>
-  <meta name="description" content="Turn AI code wait-states into ad real estate. Earn 70% of the revenue.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <meta name="description" content="Turn AI code wait-states into ad real estate. Earn 60% of the revenue.">
+  <!-- Set content to your Fly API URL when frontend is hosted separately (e.g. https://api.yourdomain.com) -->
+  <meta name="hitback-api" content="">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -14,14 +18,12 @@
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-container">
-      <div class="nav-logo">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          <line x1="9" y1="10" x2="15" y2="10"/>
-        </svg>
+      <a href="index.html" class="nav-logo">
+        <img src="favicon.png" alt="HitBack" class="site-logo" width="32" height="32">
         <span>HitBack</span>
-      </div>
+      </a>
       <div class="nav-links">
+        <a href="#earnings" class="nav-link" id="nav-earnings">My Earnings</a>
         <a href="#advertisers" class="nav-link">For Advertisers</a>
         <div id="auth-section">
           <button class="btn btn-secondary btn-sm" onclick="handleLogin()">Sign In</button>
@@ -36,35 +38,13 @@
       <h1 class="hero-title">Get paid for waiting.</h1>
       <p class="hero-subtitle">
         We turned AI code wait-states into ad real estate.<br>
-        <span class="highlight-green">30% of the revenue</span> goes to you.
+        <span class="highlight-green">60% of the revenue</span> goes to you.
       </p>
 
-      <!-- Developer Dashboard UI (Hidden if not logged in / State handled by JS) -->
-      <div id="dev-dashboard" class="dev-dashboard-panel" style="display: none;">
-        
-        <div class="card dark-card">
-          <div class="card-header">
-            <span class="label">STRIPE CONNECT ID</span>
-            <span id="dev-stripe-status" class="status-badge status-warning">Not Connected</span>
-          </div>
-          <div class="card-body">
-            <button id="stripe-connect-btn" class="btn btn-dark-action" onclick="handleConnectOnboard()">
-              Connect Stripe to receive payouts
-            </button>
-          </div>
-        </div>
-
-        <div class="card dark-card">
-          <div class="card-header">
-            <span class="label">AVAILABLE BALANCE</span>
-            <span id="dev-balance" class="balance-text">$0.00</span>
-          </div>
-          <div class="card-body balance-row">
-            <span class="balance-sub">$10.00 minimum to withdraw</span>
-            <button id="withdraw-btn" class="btn btn-dark-action" onclick="handleWithdraw()" disabled>Withdraw</button>
-          </div>
-        </div>
-
+      <!-- Logged-in teaser (full dashboard in #earnings below) -->
+      <div id="dev-logged-in-teaser" class="card info-card" style="display: none;">
+        <p>You're signed in. Track impressions, earnings, and withdraw to Stripe.</p>
+        <a href="#earnings" class="btn btn-outline">Open earnings dashboard &rarr;</a>
       </div>
 
       <!-- Logged out prompt for developers -->
@@ -74,7 +54,7 @@
       </div>
 
       <div class="install-block">
-        <a href="vscode:extension/hitback.hitback" class="btn btn-primary btn-large btn-install">
+        <a href="vscode:extension/hitback.hitback-extension" class="btn btn-primary btn-large btn-install">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="8 17 12 21 16 17"/>
             <line x1="12" y1="12" x2="12" y2="21"/>
@@ -90,6 +70,66 @@
       </div>
     </section>
 
+    <!-- DEVELOPER EARNINGS PORTAL -->
+    <section id="earnings" class="section-earnings">
+      <div class="earnings-header">
+        <span class="section-label text-green">Developer portal</span>
+        <h2 class="section-title">Your earnings</h2>
+        <p class="section-desc">See how much you've earned from ad impressions in your editor. Sign in with the same account you use in the extension.</p>
+      </div>
+
+      <div id="earnings-logged-out" class="card info-card">
+        <p>Sign in to view your balance, impression count, and payout history.</p>
+        <button class="btn btn-outline" onclick="handleLogin()">Sign In to View Earnings</button>
+      </div>
+
+      <div id="earnings-dashboard" style="display: none;">
+        <div class="earnings-hero card dark-card">
+          <div class="earnings-hero-top">
+            <span class="label">AVAILABLE BALANCE</span>
+            <span id="earnings-balance" class="earnings-balance-big">$0.00</span>
+          </div>
+          <div class="earnings-hero-actions">
+            <span class="balance-sub">$10.00 minimum to withdraw</span>
+            <div class="earnings-action-btns">
+              <button id="stripe-connect-btn" class="btn btn-dark-action" onclick="handleConnectOnboard()">
+                Connect Stripe
+              </button>
+              <button id="withdraw-btn" class="btn btn-dark-action" onclick="handleWithdraw()" disabled>Withdraw</button>
+            </div>
+          </div>
+          <div class="earnings-stripe-row">
+            <span class="label">PAYOUT STATUS</span>
+            <span id="dev-stripe-status" class="status-badge status-warning">Not Connected</span>
+          </div>
+        </div>
+
+        <div class="earnings-stats-grid">
+          <div class="card stat-card">
+            <span class="stat-label">THIS MONTH</span>
+            <span id="stat-month" class="stat-value">$0.00</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">PAID IMPRESSIONS</span>
+            <span id="stat-impressions" class="stat-value">0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">LIFETIME EARNED</span>
+            <span id="stat-lifetime" class="stat-value">$0.00</span>
+          </div>
+        </div>
+
+        <div class="card earnings-history-card">
+          <div class="card-header earnings-history-header">
+            <span class="label">RECENT EARNINGS</span>
+          </div>
+          <div id="earnings-history" class="earnings-history-list">
+            <div class="earnings-empty">No earnings yet. Install the extension and run your AI agent to start earning.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- SCROLL ARROW -->
     <div class="scroll-indicator">
       <a href="#advertisers">
@@ -102,12 +142,10 @@
     <!-- ADVERTISER SECTION -->
     <section id="advertisers" class="section-advertisers">
       <div class="advertiser-header">
-        <span class="section-label text-blue">ADVERTISERS</span>
-        <h2 class="section-title">Bid live for the most-watched spinner on Earth.</h2>
+        <span class="section-label text-blue">For advertisers · bid on this panel</span>
+        <h2 class="section-title">Bid live for the most-watched screen in AI-assisted development.</h2>
         <p class="section-desc">
-          Reach developers exactly when they have 10-15 seconds of forced downtime.
-          The HitBack extension forces focus on your ad while their AI agent writes code.
-          You pay for blocks of impressions. No subscription, cancel anytime.
+          Each block buys 1,000 fifteen-second panel impressions inside a developer's editor while their AI agent is actively building. Highest bid serves first — bid any amount from $1, outbid the top to take #1 or queue behind it. 60% of every dollar goes to the developer whose machine showed your ad.
         </p>
       </div>
 
@@ -125,9 +163,9 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="cpc-bid">CPC BID (cents)</label>
-            <input type="number" id="cpc-bid" name="cpcBidCents" class="form-input" value="5" min="1" required>
-            <div class="form-hint">Higher bids get priority placement in the queue.</div>
+            <label class="form-label" for="cpm-rate">CPM RATE (cents per 1,000 impressions)</label>
+            <input type="number" id="cpm-rate" name="cpmCents" class="form-input" value="1000" min="100" required>
+            <div class="form-hint">Higher CPM wins priority in the live queue (e.g. 1000 = $10.00 CPM).</div>
           </div>
 
           <div class="form-group">
@@ -161,7 +199,7 @@
     <!-- LIVE MARKET SECTION -->
     <section class="section-market">
       <div class="market-header">
-        <span class="section-label text-blue">LIVE BID MARKET</span>
+        <span class="section-label text-blue">LIVE CPM MARKET</span>
       </div>
       <div class="card market-card">
         <div id="queue-list" class="queue-list">

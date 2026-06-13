@@ -11,6 +11,7 @@ import billingRouter from "./routes/billing";
 import payoutsRouter from "./routes/payouts";
 import webhooksRouter from "./routes/webhooks";
 import advertiserRouter from "./routes/advertiser";
+import adminRouter from "./routes/admin";
 import { isSupabaseConfigured } from "./lib/supabase";
 import { isStripeConfigured } from "./lib/stripe";
 
@@ -36,6 +37,7 @@ app.use("/api/impressions", impressionsRouter);
 app.use("/auth", authRouter);
 app.use("/api/billing", billingRouter);
 app.use("/api/payouts", payoutsRouter);
+app.use("/api/admin", adminRouter);
 app.use("/api/advertiser", advertiserRouter);
 
 // --- Portal (static files) ---
@@ -61,8 +63,8 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server (0.0.0.0 required for Fly.io / Docker)
+app.listen(PORT, "0.0.0.0", () => {
   const sb = isSupabaseConfigured() ? "✅ Supabase" : "⚠️  No Supabase";
   const st = isStripeConfigured() ? "✅ Stripe" : "⚠️  No Stripe";
 
@@ -85,6 +87,8 @@ app.listen(PORT, () => {
   console.log("    GET  /api/advertiser/campaigns  — list campaigns");
   console.log("    POST /api/advertiser/campaigns  — create campaign");
   console.log("    GET  /api/advertiser/stats      — campaign stats");
+  console.log("    GET  /api/payouts/dashboard       — developer earnings portal");
+  console.log("    GET  /api/payouts/balance         — developer balance");
   console.log("    POST /api/payouts/connect-onboard — Stripe Connect");
   console.log("    GET  /portal/                  — advertiser portal");
   console.log("    GET  /health                   — health check");

@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
+import { getPortalUrl } from "../lib/portalUrl";
+import { extractAuthToken } from "../lib/resolveUser";
 
 const router = Router();
 
@@ -8,7 +10,7 @@ const router = Router();
  * Initiates Google OAuth flow via Supabase.
  * Redirects the user to Google's consent screen.
  */
-router.get("/google", async (_req: Request, res: Response) => {
+router.get("/google", async (req: Request, res: Response) => {
   if (!isSupabaseConfigured()) {
     res.status(503).json({ error: "Auth not available (Supabase not configured)" });
     return;
@@ -16,7 +18,18 @@ router.get("/google", async (_req: Request, res: Response) => {
 
   try {
     const sb = getSupabase();
-    const redirectTo = `${process.env.FRONTEND_URL || "http://localhost:3001/portal"}/auth/callback`;
+    const context = req.query.context as string;
+    const editor =
+      context === "cursor" ? "cursor" : context === "vscode" ? "vscode" : undefined;
+
+    const portalUrl = getPortalUrl();
+    let redirectTo = `${portalUrl}/auth-callback.html`;
+
+    if (context === "vscode" || context === "cursor") {
+      redirectTo = editor
+        ? `${portalUrl}/vscode-callback.html?editor=${editor}`
+        : `${portalUrl}/vscode-callback.html`;
+    }
 
     const { data, error } = await sb.auth.signInWithOAuth({
       provider: "google",
@@ -122,7 +135,7 @@ router.get("/me", async (req: Request, res: Response) => {
     return;
   }
 
-  const token = req.cookies?.hb_token;
+  const token = extractAuthToken(req);
 
   if (!token) {
     res.status(401).json({ error: "Not authenticated" });

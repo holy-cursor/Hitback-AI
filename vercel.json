@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": null,
-  "buildCommand": "echo \"No build needed\"",
-  "outputDirectory": "packages/backend/src/portal",
+  "buildCommand": null,
+  "outputDirectory": "frontend",
   "cleanUrls": true
 }

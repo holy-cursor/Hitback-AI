@@ -39,8 +39,16 @@ app.use("/api/payouts", payoutsRouter);
 app.use("/api/advertiser", advertiserRouter);
 
 // --- Portal (static files) ---
-const portalDir = path.join(__dirname, "portal");
+// Depending on if we are running from src/ or dist/, we go up 2 levels to packages/backend, then up 1 level to root, so ../../../frontend.
+// Wait: __dirname is packages/backend/src or packages/backend/dist.
+// To get to root, it's path.join(__dirname, "../../../frontend")
+const portalDir = path.join(__dirname, "../../../frontend");
 app.use("/portal", express.static(portalDir));
+
+// Root redirect
+app.get("/", (_req, res) => {
+  res.redirect("/portal/index.html");
+});
 
 // Health check
 app.get("/health", (_req, res) => {

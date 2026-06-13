@@ -338,6 +338,45 @@ body::after {
 .toast--error { background: #ef4444; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
+/* --- Sign In Modal --- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-card {
+  position: relative; width: 100%; max-width: 400px;
+  background: var(--bg-card); border: 1px solid var(--border-light);
+  border-radius: var(--radius-md); padding: 32px 28px;
+  box-shadow: var(--shadow-lg); text-align: center;
+}
+.modal-close {
+  position: absolute; top: 12px; right: 14px;
+  background: none; border: none; font-size: 24px; line-height: 1;
+  color: var(--text-muted); cursor: pointer;
+}
+.modal-close:hover { color: var(--text-primary); }
+.modal-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.modal-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
+.modal-card .form-group { text-align: left; margin-bottom: 16px; }
+.modal-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0; color: var(--text-muted); font-size: 13px;
+}
+.modal-divider::before, .modal-divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--border-light);
+}
+.modal-google-btn { gap: 10px; }
+.modal-footer-text { margin-top: 20px; font-size: 13px; color: var(--text-secondary); }
+.link-btn {
+  background: none; border: none; color: var(--color-blue);
+  font-weight: 600; cursor: pointer; font-family: inherit; font-size: 13px;
+  padding: 0;
+}
+.link-btn:hover { text-decoration: underline; }
+
 /* --- Responsive --- */
 @media (max-width: 640px) {
   .hero-title { font-size: 36px; }

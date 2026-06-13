@@ -5,6 +5,39 @@ import { extractAuthToken } from "../lib/resolveUser";
 
 const router = Router();
 
+function setAuthCookie(res: Response, accessToken: string): void {
+  const isProd = process.env.NODE_ENV === "production";
+  res.cookie("hb_token", accessToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
+
+async function upsertUserProfile(
+  sb: ReturnType<typeof getSupabase>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
+  role = "advertiser"
+): Promise<void> {
+  const { error } = await sb.from("user_profiles").upsert(
+    {
+      id: user.id,
+      email: user.email,
+      display_name:
+        (user.user_metadata?.full_name as string) ||
+        user.email?.split("@")[0] ||
+        "User",
+      role,
+    },
+    { onConflict: "id" }
+  );
+
+  if (error) {
+    console.error("[Auth] Profile upsert error:", error.message);
+  }
+}
+
 /**
  * GET /auth/google
  * Initiates Google OAuth flow via Supabase.
@@ -50,6 +83,105 @@ router.get("/google", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /auth/login
+ * Email + password sign-in via Supabase.
+ */
+router.post("/login", async (req: Request, res: Response) => {
+  if (!isSupabaseConfigured()) {
+    res.status(503).json({ error: "Auth not available" });
+    return;
+  }
+
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (error || !data.session || !data.user) {
+      res.status(401).json({ error: error?.message || "Invalid email or password" });
+      return;
+    }
+
+    setAuthCookie(res, data.session.access_token);
+    await upsertUserProfile(sb, data.user);
+
+    console.log(`[Auth] Email login: ${data.user.email}`);
+
+    res.json({
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name:
+          data.user.user_metadata?.full_name ||
+          data.user.email?.split("@")[0],
+      },
+    });
+  } catch (err) {
+    console.error("[Auth] Login error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /auth/signup
+ * Create account with email + password.
+ */
+router.post("/signup", async (req: Request, res: Response) => {
+  if (!isSupabaseConfigured()) {
+    res.status(503).json({ error: "Auth not available" });
+    return;
+  }
+
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  if (password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters" });
+    return;
+  }
+
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb.auth.signUp({ email, password });
+
+    if (error || !data.user) {
+      res.status(400).json({ error: error?.message || "Could not create account" });
+      return;
+    }
+
+    if (!data.session) {
+      res.json({
+        needsConfirmation: true,
+        message: "Check your email to confirm your account, then sign in.",
+      });
+      return;
+    }
+
+    setAuthCookie(res, data.session.access_token);
+    await upsertUserProfile(sb, data.user);
+
+    res.json({
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.email?.split("@")[0],
+      },
+    });
+  } catch (err) {
+    console.error("[Auth] Signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
  * POST /auth/session
  * Exchanges a Supabase access token for a session.
  * Called by the frontend after OAuth callback.
@@ -82,33 +214,8 @@ router.post("/session", async (req: Request, res: Response) => {
       return;
     }
 
-    const isProd = process.env.NODE_ENV === "production";
-
-    // Cross-origin portal (hitback.xyz → api.hitback.xyz) needs SameSite=None
-    res.cookie("hb_token", access_token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
-    // Upsert user profile
-    const { error: profileError } = await sb.from("user_profiles").upsert(
-      {
-        id: data.user.id,
-        email: data.user.email,
-        display_name:
-          data.user.user_metadata?.full_name ||
-          data.user.email?.split("@")[0] ||
-          "User",
-        role: "advertiser", // Default new users to advertiser
-      },
-      { onConflict: "id" }
-    );
-
-    if (profileError) {
-      console.error("[Auth] Profile upsert error:", profileError.message);
-    }
+    setAuthCookie(res, access_token);
+    await upsertUserProfile(sb, data.user);
 
     console.log(`[Auth] Session created for: ${data.user.email}`);
 

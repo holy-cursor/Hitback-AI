@@ -82,11 +82,13 @@ router.post("/session", async (req: Request, res: Response) => {
       return;
     }
 
-    // Set HTTP-only cookie with the access token
+    const isProd = process.env.NODE_ENV === "production";
+
+    // Cross-origin portal (hitback.xyz → api.hitback.xyz) needs SameSite=None
     res.cookie("hb_token", access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 

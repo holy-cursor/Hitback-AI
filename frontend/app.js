@@ -3,10 +3,8 @@
  * Handles Auth, Developer Earnings, Advertiser Campaigns, and Live Queue
  */
 
-// Local dev hits localhost; production uses same host (Fly) or meta tag (split frontend).
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const configuredApi = document.querySelector('meta[name="hitback-api"]')?.getAttribute('content');
-const API = isLocal ? 'http://localhost:3001' : (configuredApi || window.location.origin);
+// API URL — see api-config.js (loaded before this script on index.html)
+const API = typeof getHitbackApi === "function" ? getHitbackApi() : window.location.origin;
 
 let currentUser = null;
 let selectedTierIndex = 0;

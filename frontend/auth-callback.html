@@ -6,6 +6,8 @@
   <title>Authenticating — HitBack</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
+  <meta name="hitback-api" content="https://api.hitback.xyz">
+  <script src="api-config.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -56,7 +58,7 @@
 
         statusEl.textContent = "Setting up session…";
 
-        const res = await fetch(`${window.location.origin}/auth/session`, {
+        const res = await fetch(`${getHitbackApi()}/auth/session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",

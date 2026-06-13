@@ -6,6 +6,10 @@
 // API URL — see api-config.js (loaded before this script on index.html)
 const API = typeof getHitbackApi === "function" ? getHitbackApi() : window.location.origin;
 
+// #region agent log
+fetch('http://127.0.0.1:7320/ingest/405fa7ef-03c1-4996-bf1a-5e2eeace3c2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2150e3'},body:JSON.stringify({sessionId:'2150e3',location:'app.js:init',message:'API URL resolved',data:{api:API,pageHost:window.location.hostname,pageOrigin:window.location.origin},timestamp:Date.now(),hypothesisId:'H1-H4'})}).catch(()=>{});
+// #endregion
+
 let currentUser = null;
 let selectedTierIndex = 0;
 let tiers = [];
@@ -26,6 +30,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function checkAuth() {
   try {
     const res = await fetch(`${API}/auth/me`, { credentials: "include" });
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/405fa7ef-03c1-4996-bf1a-5e2eeace3c2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2150e3'},body:JSON.stringify({sessionId:'2150e3',location:'app.js:checkAuth',message:'auth/me response',data:{api:API,status:res.status,ok:res.ok},timestamp:Date.now(),hypothesisId:'H4-H5'})}).catch(()=>{});
+    // #endregion
     if (res.ok) {
       const data = await res.json();
       currentUser = data.user;
@@ -33,15 +40,21 @@ async function checkAuth() {
     } else {
       setupLoggedOutState();
     }
-  } catch {
+  } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/405fa7ef-03c1-4996-bf1a-5e2eeace3c2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2150e3'},body:JSON.stringify({sessionId:'2150e3',location:'app.js:checkAuth:catch',message:'auth/me failed',data:{api:API,error:String(err)},timestamp:Date.now(),hypothesisId:'H4-H5'})}).catch(()=>{});
+    // #endregion
     setupLoggedOutState(); // Demo mode fallback
   }
 }
 
 function handleLogin() {
-  // Save form state in case they were filling it out
   saveFormState();
-  window.location.href = `${API}/auth/google`;
+  const loginUrl = `${API}/auth/google`;
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/405fa7ef-03c1-4996-bf1a-5e2eeace3c2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2150e3'},body:JSON.stringify({sessionId:'2150e3',location:'app.js:handleLogin',message:'redirecting to login',data:{loginUrl,api:API,pageHost:window.location.hostname},timestamp:Date.now(),hypothesisId:'H1-H4'})}).catch(()=>{});
+  // #endregion
+  window.location.href = loginUrl;
 }
 
 function handleLogout() {

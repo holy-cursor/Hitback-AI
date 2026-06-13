@@ -324,26 +324,32 @@ body::after {
 
 /* Headline field — isolated from glass .form-input (textarea/input was collapsing) */
 .headline-field-wrap {
-  border: 2px solid #94a3b8;
+  display: block !important;
+  border: 2px solid #64748b !important;
   border-radius: 10px;
-  background: #fff;
-  overflow: hidden;
+  background: #fff !important;
+  overflow: visible !important;
+  min-height: 52px;
+  margin-top: 8px;
 }
 .headline-input,
 input#ad-text.headline-input {
-  display: block;
-  width: 100%;
-  min-height: 52px;
-  padding: 14px 16px;
+  display: block !important;
+  width: 100% !important;
+  min-height: 52px !important;
+  height: auto !important;
+  padding: 14px 16px !important;
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.4;
-  color: #0f172a;
-  background: #fff;
-  border: none;
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  color: #0f172a !important;
+  background: #fff !important;
+  border: none !important;
   outline: none;
-  box-shadow: none;
-  -webkit-text-fill-color: #0f172a;
+  box-shadow: none !important;
+  -webkit-text-fill-color: #0f172a !important;
+  opacity: 1 !important;
+  visibility: visible !important;
   appearance: auto;
   -webkit-appearance: none;
 }

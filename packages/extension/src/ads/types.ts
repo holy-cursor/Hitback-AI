@@ -7,4 +7,5 @@ export interface Ad {
   id: string;
   text: string;
   url: string;
+  imageUrl?: string;
 }

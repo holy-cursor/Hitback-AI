@@ -38,7 +38,7 @@
       "properties": {
         "hitback.backendUrl": {
           "type": "string",
-          "default": "http://localhost:3001",
+          "default": "https://hitback-api.fly.dev",
           "description": "URL of the HitBack ad server backend"
         },
         "hitback.enabled": {

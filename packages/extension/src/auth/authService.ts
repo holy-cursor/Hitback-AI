@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { DEFAULT_BACKEND_URL } from '../config';
 
 export class AuthService implements vscode.UriHandler {
   private static instance: AuthService;
@@ -44,7 +45,7 @@ export class AuthService implements vscode.UriHandler {
    * Initiates the login flow by opening the browser to the backend auth endpoint.
    */
   public async login(): Promise<void> {
-    const backendUrl = vscode.workspace.getConfiguration('hitback').get<string>('backendUrl') || 'http://localhost:3001';
+    const backendUrl = vscode.workspace.getConfiguration('hitback').get<string>('backendUrl') || DEFAULT_BACKEND_URL;
     const appName = vscode.env.appName.toLowerCase();
     const editor = appName.includes('cursor') ? 'cursor' : 'vscode';
 

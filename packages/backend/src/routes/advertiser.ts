@@ -5,6 +5,59 @@ import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
 
 const router = Router();
 
+function formatCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+async function enrichCampaignsWithStats(
+  campaigns: Array<{
+    id: string;
+    total_impressions?: number;
+    remaining_impressions?: number;
+    cpm_cents?: number;
+    [key: string]: unknown;
+  }>
+) {
+  if (!campaigns.length) return campaigns;
+
+  const sb = getSupabase();
+  const ids = campaigns.map((c) => c.id);
+
+  const [{ data: impressionRows }, { data: clickRows }] = await Promise.all([
+    sb.from("impressions").select("campaign_id").in("campaign_id", ids),
+    sb.from("clicks").select("campaign_id").in("campaign_id", ids),
+  ]);
+
+  const impressionCounts: Record<string, number> = {};
+  const clickCounts: Record<string, number> = {};
+
+  for (const row of impressionRows || []) {
+    impressionCounts[row.campaign_id] = (impressionCounts[row.campaign_id] || 0) + 1;
+  }
+  for (const row of clickRows || []) {
+    clickCounts[row.campaign_id] = (clickCounts[row.campaign_id] || 0) + 1;
+  }
+
+  return campaigns.map((c) => {
+    const delivered = (c.total_impressions || 0) - (c.remaining_impressions || 0);
+    const impressions = impressionCounts[c.id] || 0;
+    const clicks = clickCounts[c.id] || 0;
+    const ctr =
+      impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + "%" : "0.00%";
+    const spendCents = Math.round((delivered * (c.cpm_cents || 0)) / 1000);
+
+    return {
+      ...c,
+      delivered_impressions: delivered,
+      impression_count: impressions,
+      click_count: clicks,
+      ctr,
+      spend_cents: spendCents,
+      spend_display: formatCents(spendCents),
+    };
+  });
+}
+
 /**
  * GET /api/advertiser/campaigns
  * Lists all campaigns for the authenticated advertiser.
@@ -23,6 +76,12 @@ router.get("/campaigns", requireAuth, async (req: Request, res: Response) => {
           cpm_cents: 800,
           status: "active",
           created_at: new Date().toISOString(),
+          delivered_impressions: 1800,
+          impression_count: 1800,
+          click_count: 79,
+          ctr: "4.39%",
+          spend_cents: 1440,
+          spend_display: "$14.40",
         },
       ],
       mode: "demo",
@@ -45,7 +104,8 @@ router.get("/campaigns", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ campaigns: campaigns || [] });
+    const enriched = await enrichCampaignsWithStats(campaigns || []);
+    res.json({ campaigns: enriched });
   } catch (err) {
     console.error("[Advertiser] Unexpected error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -56,36 +116,68 @@ router.get("/campaigns", requireAuth, async (req: Request, res: Response) => {
  * POST /api/advertiser/campaigns
  * Creates a new campaign (draft status, pending checkout).
  *
- * Body: { adText: string, adUrl: string, cpmCents?: number }
+ * Body: { adText: string, adUrl: string, adImageUrl?: string, cpmCents?: number }
  */
 router.post("/campaigns", requireAuth, async (req: Request, res: Response) => {
-  const { adText, adUrl, cpmCents } = req.body;
+  const { adText, adUrl, adImageUrl, cpmCents } = req.body;
 
-  if (!adText || typeof adText !== "string" || adText.length > 60) {
-    res.status(400).json({ error: "adText is required and must be ≤60 characters" });
+  if (!adText || typeof adText !== "string" || adText.trim().length === 0) {
+    res.status(400).json({ error: "Ad text is required" });
+    return;
+  }
+
+  if (adText.length > 60) {
+    res.status(400).json({ error: "Ad text must be 60 characters or fewer" });
     return;
   }
 
   if (!adUrl || typeof adUrl !== "string") {
-    res.status(400).json({ error: "adUrl is required" });
+    res.status(400).json({ error: "Destination URL is required" });
     return;
   }
 
-  // Validate URL format
   try {
     new URL(adUrl);
   } catch {
-    res.status(400).json({ error: "adUrl must be a valid URL" });
+    res.status(400).json({ error: "Destination URL must be a valid URL (include https://)" });
     return;
   }
 
+  let imageUrl: string | null = null;
+  if (adImageUrl) {
+    if (typeof adImageUrl !== "string") {
+      res.status(400).json({ error: "Image URL must be a string" });
+      return;
+    }
+    try {
+      const parsed = new URL(adImageUrl.trim());
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        res.status(400).json({ error: "Image URL must use http or https" });
+        return;
+      }
+      imageUrl = parsed.toString();
+    } catch {
+      res.status(400).json({ error: "Image URL must be a valid URL" });
+      return;
+    }
+  }
+
+  const insertPayload = {
+    advertiser_id: req.user!.id,
+    ad_text: adText.trim(),
+    ad_url: adUrl.trim(),
+    ad_image_url: imageUrl,
+    cpm_cents: cpmCents || DEFAULT_CPM_CENTS,
+    status: "draft" as const,
+  };
+
   if (!isSupabaseConfigured()) {
-    // Demo mode — return a fake campaign
     res.json({
       campaign: {
         id: `demo-${Date.now()}`,
-        ad_text: adText,
-        ad_url: adUrl,
+        ad_text: insertPayload.ad_text,
+        ad_url: insertPayload.ad_url,
+        ad_image_url: imageUrl,
         status: "draft",
         created_at: new Date().toISOString(),
       },
@@ -99,19 +191,17 @@ router.post("/campaigns", requireAuth, async (req: Request, res: Response) => {
 
     const { data: campaign, error } = await sb
       .from("campaigns")
-      .insert({
-        advertiser_id: req.user!.id,
-        ad_text: adText,
-        ad_url: adUrl,
-        cpm_cents: cpmCents || DEFAULT_CPM_CENTS,
-        status: "draft",
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
     if (error) {
       console.error("[Advertiser] Campaign insert error:", error.message);
-      res.status(500).json({ error: "Failed to create campaign" });
+      const hint =
+        error.message.includes("ad_image_url")
+          ? " Run migration 003_ad_image_url.sql in Supabase, or remove the image URL."
+          : "";
+      res.status(500).json({ error: `Failed to create campaign.${hint}` });
       return;
     }
 
@@ -146,6 +236,23 @@ router.patch("/campaigns/:id", requireAuth, async (req: Request, res: Response) 
   try {
     const sb = getSupabase();
 
+    const { data: existing } = await sb
+      .from("campaigns")
+      .select("id, status")
+      .eq("id", id)
+      .eq("advertiser_id", req.user!.id)
+      .maybeSingle();
+
+    if (!existing) {
+      res.status(404).json({ error: "Campaign not found" });
+      return;
+    }
+
+    if (!["active", "paused"].includes(existing.status)) {
+      res.status(400).json({ error: "Only active or paused campaigns can be updated" });
+      return;
+    }
+
     const { error } = await sb
       .from("campaigns")
       .update({ status, updated_at: new Date().toISOString() })
@@ -177,7 +284,8 @@ router.get("/stats", requireAuth, async (req: Request, res: Response) => {
       totalImpressions: 4280,
       totalClicks: 187,
       ctr: "4.37%",
-      totalSpendCents: 2140,
+      totalSpendCents: 3424,
+      totalSpendDisplay: "$34.24",
       activeCampaigns: 1,
       mode: "demo",
     });
@@ -191,7 +299,7 @@ router.get("/stats", requireAuth, async (req: Request, res: Response) => {
     // Get user's campaigns
     const { data: campaigns } = await sb
       .from("campaigns")
-      .select("id, status, total_impressions, remaining_impressions")
+      .select("id, status, total_impressions, remaining_impressions, cpm_cents")
       .eq("advertiser_id", userId);
 
     if (!campaigns || campaigns.length === 0) {
@@ -200,6 +308,7 @@ router.get("/stats", requireAuth, async (req: Request, res: Response) => {
         totalClicks: 0,
         ctr: "0.00%",
         totalSpendCents: 0,
+        totalSpendDisplay: "$0.00",
         activeCampaigns: 0,
       });
       return;
@@ -226,10 +335,10 @@ router.get("/stats", requireAuth, async (req: Request, res: Response) => {
         ? ((totalClicks / totalImpressions) * 100).toFixed(2) + "%"
         : "0.00%";
 
-    const totalSpent = campaigns.reduce(
-      (sum, c) => sum + (c.total_impressions - c.remaining_impressions),
-      0
-    );
+    const totalSpendCents = campaigns.reduce((sum, c) => {
+      const delivered = c.total_impressions - c.remaining_impressions;
+      return sum + Math.round((delivered * (c.cpm_cents || 0)) / 1000);
+    }, 0);
 
     const activeCampaigns = campaigns.filter(
       (c) => c.status === "active"
@@ -239,7 +348,8 @@ router.get("/stats", requireAuth, async (req: Request, res: Response) => {
       totalImpressions,
       totalClicks,
       ctr,
-      totalSpendCents: totalSpent,
+      totalSpendCents,
+      totalSpendDisplay: formatCents(totalSpendCents),
       activeCampaigns,
     });
   } catch (err) {

@@ -13,6 +13,14 @@ import { randomUUID } from "crypto";
 import { AuthService } from "./auth/authService";
 
 import { RateLimiter } from "./ads/rateLimiter";
+import { DEFAULT_BACKEND_URL } from "./config";
+
+function getBackendUrl(): string {
+  return (
+    vscode.workspace.getConfiguration("hitback").get<string>("backendUrl") ||
+    DEFAULT_BACKEND_URL
+  );
+}
 
 /**
  * HitBack Extension — AI Wait State Ad Network
@@ -101,9 +109,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
 
-    const backendUrl = vscode.workspace
-      .getConfiguration("hitback")
-      .get<string>("backendUrl", "http://localhost:3001");
+    const backendUrl = getBackendUrl();
 
     const token = authService.getToken() || undefined;
     const fetchedAd = await fetchCurrentAd(backendUrl, token);
@@ -139,9 +145,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       console.log(`[HitBack] Ad clicked: "${ad.text}" → ${ad.url}`);
 
-      const backendUrl = vscode.workspace
-        .getConfiguration("hitback")
-        .get<string>("backendUrl", "http://localhost:3001");
+      const backendUrl = getBackendUrl();
 
       const token = authService.getToken() || undefined;
       reportClick(backendUrl, ad.id, extensionUserId, token);
@@ -152,9 +156,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     "hitback.testAd",
     async () => {
       console.log("[HitBack:Test] Manually triggering ad fetch...");
-      const backendUrl = vscode.workspace
-        .getConfiguration("hitback")
-        .get<string>("backendUrl", "http://localhost:3001");
+      const backendUrl = getBackendUrl();
 
       const token = authService.getToken() || undefined;
       const fetchedAd = await fetchCurrentAd(backendUrl, token);

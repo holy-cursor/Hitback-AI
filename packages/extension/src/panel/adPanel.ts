@@ -77,6 +77,9 @@ export class AdPanel {
   private getHtml(ad: Ad): string {
     const text = this.esc(ad.text);
     const url = JSON.stringify(ad.url);
+    const imageBlock = ad.imageUrl
+      ? `<img class="hero-image" src="${this.esc(ad.imageUrl)}" alt="" />`
+      : "";
 
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -151,6 +154,16 @@ export class AdPanel {
     border: 1px solid rgba(167,139,250,.15);
     padding: 4px 12px;
     border-radius: 20px;
+  }
+
+  /* ── hero image ── */
+  .hero-image {
+    max-width: 100%;
+    max-height: 160px;
+    width: auto;
+    border-radius: 12px;
+    object-fit: contain;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
   }
 
   /* ── headline ── */
@@ -233,6 +246,8 @@ export class AdPanel {
     </div>
 
     <div class="badge">📢 Sponsored</div>
+
+    ${imageBlock}
 
     <div class="headline">${text}</div>
 

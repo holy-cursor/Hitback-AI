@@ -44,7 +44,7 @@ router.get("/current", async (_req: Request, res: Response) => {
 
       const { data: campaign, error } = await sb
         .from("campaigns")
-        .select("id, ad_text, ad_url, cpm_cents, remaining_impressions")
+        .select("id, ad_text, ad_url, ad_image_url, cpm_cents, remaining_impressions")
         .eq("status", "active")
         .gt("remaining_impressions", 0)
         .order("cpm_cents", { ascending: false })
@@ -63,6 +63,7 @@ router.get("/current", async (_req: Request, res: Response) => {
           id: campaign.id,
           text: campaign.ad_text,
           url: campaign.ad_url,
+          imageUrl: campaign.ad_image_url || undefined,
         });
         return;
       } else {

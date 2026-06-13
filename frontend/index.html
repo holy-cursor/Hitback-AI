@@ -150,27 +150,63 @@
         </p>
       </div>
 
+      <div id="advertiser-dashboard" class="advertiser-dashboard" style="display: none;">
+        <div class="advertiser-stats-grid">
+          <div class="card stat-card">
+            <span class="stat-label">TOTAL IMPRESSIONS</span>
+            <span id="adv-stat-impressions" class="stat-value">0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">TOTAL CLICKS</span>
+            <span id="adv-stat-clicks" class="stat-value">0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">CTR</span>
+            <span id="adv-stat-ctr" class="stat-value">0.00%</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">TOTAL SPEND</span>
+            <span id="adv-stat-spend" class="stat-value">$0.00</span>
+          </div>
+        </div>
+      </div>
+
       <div class="card form-card">
         <form id="campaign-form" onsubmit="handleCreateCampaign(event)">
           
           <div class="form-group">
-            <label class="form-label" for="ad-text">AD TEXT (Max 60 chars)</label>
-            <input type="text" id="ad-text" name="adText" class="form-input" placeholder="Try our developer tool — 50% off today" maxlength="60" required>
+            <label class="form-label" for="ad-text">Ad headline <span class="required">*</span> <span class="label-hint">(max 60 chars)</span></label>
+            <input type="text" id="ad-text" name="adText" class="form-input" placeholder="Try our developer tool — 50% off today" maxlength="60" required oninput="updateAdPreview()">
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="ad-url">DESTINATION URL</label>
+            <label class="form-label" for="ad-image-url">Ad image <span class="label-hint">(optional — HTTPS URL)</span></label>
+            <input type="url" id="ad-image-url" name="adImageUrl" class="form-input" placeholder="https://yoursite.com/banner.png" oninput="updateAdPreview()">
+            <div class="form-hint">Paste a direct link to a PNG, JPG, or WebP. Shown in the editor ad panel above your headline.</div>
+          </div>
+
+          <div id="ad-preview" class="ad-preview" style="display: none;">
+            <span class="form-label">Preview</span>
+            <div class="ad-preview-card">
+              <img id="ad-preview-image" class="ad-preview-image" alt="" style="display: none;">
+              <div id="ad-preview-text" class="ad-preview-text">Your headline appears here</div>
+              <span class="ad-preview-cta">Learn more →</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ad-url">Destination URL <span class="required">*</span></label>
             <input type="url" id="ad-url" name="adUrl" class="form-input" placeholder="https://your-product.com" required>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="cpm-rate">CPM RATE (cents per 1,000 impressions)</label>
+            <label class="form-label" for="cpm-rate">CPM rate <span class="label-hint">(cents per 1,000 impressions)</span></label>
             <input type="number" id="cpm-rate" name="cpmCents" class="form-input" value="1000" min="100" required>
             <div class="form-hint">Higher CPM wins priority in the live queue (e.g. 1000 = $10.00 CPM).</div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">IMPRESSION BLOCK</label>
+            <label class="form-label">Impression block <span class="required">*</span></label>
             <div class="tier-grid" id="tier-grid">
               <!-- JS Populated -->
             </div>
@@ -179,7 +215,7 @@
           <!-- Active Campaigns logic (shown if user has active campaigns) -->
           <div id="advertiser-campaigns" class="active-campaigns-block" style="display: none;">
             <div class="divider"></div>
-            <label class="form-label">YOUR ACTIVE CAMPAIGNS</label>
+            <label class="form-label">YOUR CAMPAIGNS</label>
             <div id="campaigns-list" class="campaigns-list"></div>
           </div>
 
@@ -213,42 +249,52 @@
 
   <footer class="footer">
     <div class="container text-center">
-      <p>&copy; 2026 HitBack. <a href="#">Privacy</a> &middot; <a href="#">Terms</a></p>
+      <p>&copy; 2026 HitBack. <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a></p>
     </div>
   </footer>
 
   <!-- Sign In Modal -->
-  <div id="signin-modal" class="modal-overlay" style="display: none;" onclick="closeSignInModalOnBackdrop(event)">
-    <div class="modal-card" role="dialog" aria-labelledby="signin-title">
-      <button type="button" class="modal-close" onclick="closeSignInModal()" aria-label="Close">&times;</button>
-      <img src="favicon.png" alt="HitBack" class="site-logo site-logo--lg" style="margin-bottom: 16px;">
-      <h2 id="signin-title" class="modal-title">Sign in to HitBack</h2>
-      <p class="modal-subtitle">Track earnings, manage campaigns, and withdraw payouts.</p>
-
-      <form id="signin-form" onsubmit="handleEmailSignIn(event)">
-        <div class="form-group">
-          <label class="form-label" for="signin-email">EMAIL</label>
-          <input type="email" id="signin-email" class="form-input" placeholder="you@example.com" required autocomplete="email">
+  <div id="signin-modal" class="modal-overlay" aria-hidden="true" onclick="closeSignInModalOnBackdrop(event)">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+      <div class="modal-header">
+        <div class="modal-brand">
+          <img src="favicon.png" alt="" class="modal-brand-icon" width="28" height="28">
+          <span class="modal-brand-text">HitBack</span>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="signin-password">PASSWORD</label>
-          <input type="password" id="signin-password" class="form-input" placeholder="••••••••" required minlength="8" autocomplete="current-password">
+        <button type="button" class="modal-close" onclick="closeSignInModal()" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-mode-tabs" role="tablist" aria-label="Authentication mode">
+          <button type="button" id="signin-tab-signin" class="modal-mode-tab is-active" role="tab" aria-selected="true" onclick="setSignInModalMode('signin')">Sign in</button>
+          <button type="button" id="signin-tab-signup" class="modal-mode-tab" role="tab" aria-selected="false" onclick="setSignInModalMode('signup')">Create account</button>
         </div>
-        <div id="signin-error" class="form-error" style="display: none;"></div>
-        <button type="submit" id="signin-submit-btn" class="btn btn-blue btn-full">Sign In</button>
-      </form>
 
-      <div class="modal-divider"><span>or</span></div>
+        <h2 id="signin-title" class="modal-title">Welcome back</h2>
+        <p id="signin-subtitle" class="modal-subtitle">Sign in to track earnings, manage campaigns, and withdraw payouts.</p>
 
-      <button type="button" class="btn btn-outline btn-full modal-google-btn" onclick="handleGoogleSignIn()">
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Continue with Google
-      </button>
+        <button type="button" class="modal-google-btn" onclick="handleGoogleSignIn()">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <span>Continue with Google</span>
+        </button>
 
-      <p class="modal-footer-text">
-        Don't have an account?
-        <button type="button" class="link-btn" onclick="handleSignUpFromModal()">Create one</button>
-      </p>
+        <div class="modal-divider"><span>or continue with email</span></div>
+
+        <form id="signin-form" onsubmit="handleEmailAuth(event)">
+          <div class="form-group modal-form-group">
+            <label class="form-label" for="signin-email">Email</label>
+            <input type="email" id="signin-email" class="form-input modal-input" placeholder="you@example.com" required autocomplete="email">
+          </div>
+          <div class="form-group modal-form-group">
+            <label class="form-label" for="signin-password">Password</label>
+            <input type="password" id="signin-password" class="form-input modal-input" placeholder="At least 8 characters" required minlength="8" autocomplete="current-password">
+          </div>
+          <div id="signin-error" class="modal-error" style="display: none;" role="alert"></div>
+          <button type="submit" id="signin-submit-btn" class="btn btn-blue btn-full modal-submit-btn">Sign In</button>
+        </form>
+      </div>
     </div>
   </div>
 

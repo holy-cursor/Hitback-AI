@@ -9,16 +9,17 @@ const API = typeof getHitbackApi === "function" ? getHitbackApi() : window.locat
 let currentUser = null;
 let selectedTierIndex = 0;
 let tiers = [];
+let signInModalMode = "signin";
 
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Check if we just came back from auth with pending checkout
   checkPendingCheckout();
-  
+
   await checkAuth();
   await loadTiers();
   startQueuePolling();
+  await maybeResumeCheckout();
 });
 
 // ── Auth ─────────────────────────────────────────────────────
@@ -47,17 +48,71 @@ function openSignInModal() {
   const modal = document.getElementById("signin-modal");
   const errorEl = document.getElementById("signin-error");
   if (errorEl) errorEl.style.display = "none";
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    setSignInModalMode("signin");
+    document.getElementById("signin-email")?.focus();
+  }
 }
 
 function closeSignInModal() {
   const modal = document.getElementById("signin-modal");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  }
 }
 
 function closeSignInModalOnBackdrop(event) {
   if (event.target.id === "signin-modal") closeSignInModal();
 }
+
+function setSignInModalMode(mode) {
+  signInModalMode = mode;
+  const title = document.getElementById("signin-title");
+  const subtitle = document.getElementById("signin-subtitle");
+  const submitBtn = document.getElementById("signin-submit-btn");
+  const passwordInput = document.getElementById("signin-password");
+  const signinTab = document.getElementById("signin-tab-signin");
+  const signupTab = document.getElementById("signin-tab-signup");
+  const errorEl = document.getElementById("signin-error");
+
+  if (errorEl) errorEl.style.display = "none";
+
+  if (signinTab && signupTab) {
+    const isSignIn = mode === "signin";
+    signinTab.classList.toggle("is-active", isSignIn);
+    signupTab.classList.toggle("is-active", !isSignIn);
+    signinTab.setAttribute("aria-selected", String(isSignIn));
+    signupTab.setAttribute("aria-selected", String(!isSignIn));
+  }
+
+  if (title) title.textContent = mode === "signin" ? "Welcome back" : "Create your account";
+  if (subtitle) {
+    subtitle.textContent = mode === "signin"
+      ? "Sign in to track earnings, manage campaigns, and withdraw payouts."
+      : "Start earning from AI wait-states. Free for developers.";
+  }
+  if (submitBtn) submitBtn.textContent = mode === "signin" ? "Sign In" : "Create Account";
+  if (passwordInput) {
+    passwordInput.autocomplete = mode === "signin" ? "current-password" : "new-password";
+  }
+}
+
+function handleEmailAuth(event) {
+  event.preventDefault();
+  if (signInModalMode === "signup") return handleSignUpFromModal();
+  return handleEmailSignIn(event);
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.getElementById("signin-modal")?.classList.contains("is-open")) {
+    closeSignInModal();
+  }
+});
 
 function handleGoogleSignIn() {
   saveFormState();
@@ -186,6 +241,7 @@ function setupLoggedInState() {
   document.getElementById("checkout-login-hint").style.display = "none";
 
   loadDevDashboard();
+  loadAdvertiserStats();
   loadActiveCampaigns();
 }
 
@@ -196,6 +252,7 @@ function setupLoggedOutState() {
   document.getElementById("earnings-dashboard").style.display = "none";
   document.getElementById("checkout-login-hint").style.display = "block";
   document.getElementById("advertiser-campaigns").style.display = "none";
+  document.getElementById("advertiser-dashboard").style.display = "none";
 }
 
 // ── Developer Earnings Portal ────────────────────────────────
@@ -318,6 +375,79 @@ async function handleWithdraw() {
 
 // ── Advertiser Campaigns & Checkout ──────────────────────────
 
+async function loadAdvertiserStats() {
+  const dashboard = document.getElementById("advertiser-dashboard");
+  if (!dashboard || !currentUser) return;
+
+  try {
+    const res = await fetch(`${API}/api/advertiser/stats`, { credentials: "include" });
+    if (!res.ok) {
+      dashboard.style.display = "none";
+      return;
+    }
+
+    const data = await res.json();
+    const impressionsEl = document.getElementById("adv-stat-impressions");
+    const clicksEl = document.getElementById("adv-stat-clicks");
+    const ctrEl = document.getElementById("adv-stat-ctr");
+    const spendEl = document.getElementById("adv-stat-spend");
+
+    if (impressionsEl) impressionsEl.textContent = (data.totalImpressions || 0).toLocaleString();
+    if (clicksEl) clicksEl.textContent = (data.totalClicks || 0).toLocaleString();
+    if (ctrEl) ctrEl.textContent = data.ctr || "0.00%";
+    if (spendEl) spendEl.textContent = data.totalSpendDisplay || "$0.00";
+
+    dashboard.style.display = "block";
+  } catch {
+    dashboard.style.display = "none";
+  }
+}
+
+function campaignStatusBadge(status) {
+  const labels = {
+    active: "Active",
+    paused: "Paused",
+    exhausted: "Exhausted",
+    draft: "Draft",
+  };
+  const label = labels[status] || status;
+  const cls =
+    status === "active" ? "camp-status--active"
+    : status === "paused" ? "camp-status--paused"
+    : status === "exhausted" ? "camp-status--exhausted"
+    : "camp-status--draft";
+  return `<span class="camp-status-badge ${cls}">${escapeHtml(label)}</span>`;
+}
+
+async function toggleCampaignStatus(campaignId, currentStatus) {
+  const nextStatus = currentStatus === "active" ? "paused" : "active";
+  const btn = document.querySelector(`[data-campaign-btn="${campaignId}"]`);
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/advertiser/campaigns/${campaignId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ status: nextStatus }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      showToast(data.error || "Could not update campaign", "error");
+      return;
+    }
+
+    showToast(nextStatus === "paused" ? "Campaign paused" : "Campaign resumed", "success");
+    await loadActiveCampaigns();
+    await loadAdvertiserStats();
+  } catch {
+    showToast("Network error", "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function loadActiveCampaigns() {
   const container = document.getElementById("advertiser-campaigns");
   const list = document.getElementById("campaigns-list");
@@ -327,27 +457,62 @@ async function loadActiveCampaigns() {
     const res = await fetch(`${API}/api/advertiser/campaigns`, { credentials: "include" });
     if (res.ok) {
       const data = await res.json();
-      const campaigns = (data.campaigns || []).filter(c => c.status === 'active' || c.status === 'paused');
-      
+      const campaigns = (data.campaigns || []).filter(
+        (c) => c.status === "active" || c.status === "paused" || c.status === "exhausted"
+      );
+
       if (campaigns.length === 0) {
         container.style.display = "none";
         return;
       }
-      
+
       container.style.display = "block";
-      list.innerHTML = campaigns.map(c => {
-        const used = (c.total_impressions || 0) - (c.remaining_impressions || 0);
-        const pct = c.total_impressions ? Math.round((used / c.total_impressions) * 100) : 0;
+      list.innerHTML = campaigns.map((c) => {
+        const delivered = c.delivered_impressions ?? ((c.total_impressions || 0) - (c.remaining_impressions || 0));
+        const total = c.total_impressions || 0;
+        const pct = total ? Math.round((delivered / total) * 100) : 0;
+        const clicks = c.click_count ?? 0;
+        const ctr = c.ctr || "0.00%";
+        const spend = c.spend_display || "$0.00";
+        const cpm = c.cpm_cents ? `$${(c.cpm_cents / 100).toFixed(2)}` : "—";
+        const imageHtml = c.ad_image_url
+          ? `<img class="camp-thumb" src="${escapeHtml(c.ad_image_url)}" alt="">`
+          : "";
+        const canToggle = c.status === "active" || c.status === "paused";
+        const actionLabel = c.status === "active" ? "Pause" : "Resume";
+        const actionClass = c.status === "active" ? "btn-secondary" : "btn-blue";
+
         return `
           <div class="campaign-item">
-            <div class="camp-info">
+            ${imageHtml}
+            <div class="camp-main">
+              <div class="camp-header">
+                ${campaignStatusBadge(c.status)}
+                <span class="camp-cpm">${escapeHtml(cpm)} CPM</span>
+              </div>
               <div class="camp-text">${escapeHtml(c.ad_text)}</div>
               <div class="camp-url">${escapeHtml(c.ad_url)}</div>
+              <div class="camp-progress">
+                <div class="camp-progress-bar">
+                  <div class="camp-progress-fill" style="width: ${pct}%"></div>
+                </div>
+                <span class="camp-progress-label">${delivered.toLocaleString()} / ${total.toLocaleString()} impressions (${pct}%)</span>
+              </div>
+              <div class="camp-stats-row">
+                <span>${clicks.toLocaleString()} clicks</span>
+                <span>${escapeHtml(ctr)} CTR</span>
+                <span>${escapeHtml(spend)} spent</span>
+              </div>
             </div>
-            <div class="camp-meta">
-              <div class="camp-prog">${pct}%</div>
-              <div class="camp-stat">${c.status}</div>
-            </div>
+            ${canToggle ? `
+              <button type="button" class="btn btn-sm ${actionClass} camp-action-btn"
+                data-campaign-btn="${c.id}"
+                data-campaign-id="${c.id}"
+                data-campaign-status="${c.status}"
+                onclick="toggleCampaignStatus(this.dataset.campaignId, this.dataset.campaignStatus)">
+                ${actionLabel}
+              </button>
+            ` : `<span class="camp-exhausted-label">Completed</span>`}
           </div>
         `;
       }).join("");
@@ -390,39 +555,59 @@ function selectTier(index) {
 
 async function handleCreateCampaign(e) {
   e.preventDefault();
-  
-  if (!currentUser) {
-    handleLogin();
-    return;
-  }
 
   const form = e.target;
   const errorEl = document.getElementById("form-error");
   const btn = document.getElementById("checkout-btn");
 
-  const adText = form.adText.value.trim();
-  const adUrl = form.adUrl.value.trim();
-  const cpmCents = parseInt(form.cpmCents.value) || 1000;
+  const adText = form.adText?.value?.trim() || "";
+  const adUrl = form.adUrl?.value?.trim() || "";
+  const adImageUrl = form.adImageUrl?.value?.trim() || "";
+  const cpmCents = parseInt(form.cpmCents?.value, 10) || 1000;
 
-  if (!adText || !adUrl) return;
+  errorEl.style.display = "none";
+
+  if (!adText) {
+    errorEl.textContent = "Add an ad headline — this is the text developers see in their editor.";
+    errorEl.style.display = "block";
+    document.getElementById("ad-text")?.focus();
+    return;
+  }
+
+  if (!adUrl) {
+    errorEl.textContent = "Add a destination URL (where clicks go), e.g. https://contentrewards.com";
+    errorEl.style.display = "block";
+    document.getElementById("ad-url")?.focus();
+    return;
+  }
+
+  if (!currentUser) {
+    saveFormState();
+    sessionStorage.setItem("autoCheckoutAfterLogin", "true");
+    showToast("Sign in to continue to Stripe checkout", "success");
+    handleLogin();
+    return;
+  }
 
   btn.disabled = true;
   btn.textContent = "Processing...";
-  errorEl.style.display = "none";
 
   try {
-    // 1. Create Campaign
     const res = await fetch(`${API}/api/advertiser/campaigns`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ adText, adUrl, cpmCents }),
+      body: JSON.stringify({
+        adText,
+        adUrl,
+        adImageUrl: adImageUrl || undefined,
+        cpmCents,
+      }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to create campaign");
 
-    // 2. Checkout
     const checkoutRes = await fetch(`${API}/api/billing/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -430,26 +615,68 @@ async function handleCreateCampaign(e) {
       body: JSON.stringify({ campaignId: data.campaign.id, tierIndex: selectedTierIndex }),
     });
 
-    if (checkoutRes.ok) {
-      const checkoutData = await checkoutRes.json();
-      if (checkoutData.checkoutUrl) {
-        window.location.href = checkoutData.checkoutUrl;
-        return;
-      }
+    const checkoutData = await checkoutRes.json().catch(() => ({}));
+
+    if (!checkoutRes.ok) {
+      throw new Error(checkoutData.error || "Could not start Stripe checkout");
     }
-    
-    // Demo Mode fallback
-    showToast("Campaign created (Demo mode — no Stripe checkout)", "success");
-    form.reset();
-    await loadActiveCampaigns();
-    
+
+    if (checkoutData.checkoutUrl) {
+      sessionStorage.removeItem("pendingCheckout");
+      sessionStorage.removeItem("autoCheckoutAfterLogin");
+      window.location.href = checkoutData.checkoutUrl;
+      return;
+    }
+
+    throw new Error("Stripe did not return a checkout URL");
   } catch (err) {
     errorEl.textContent = err.message || "Network error. Please try again.";
     errorEl.style.display = "block";
+    showToast(err.message || "Checkout failed", "error");
   }
-  
+
   btn.disabled = false;
   btn.textContent = "Checkout securely with Stripe";
+}
+
+function updateAdPreview() {
+  const preview = document.getElementById("ad-preview");
+  const previewText = document.getElementById("ad-preview-text");
+  const previewImage = document.getElementById("ad-preview-image");
+  const text = document.getElementById("ad-text")?.value?.trim() || "";
+  const imageUrl = document.getElementById("ad-image-url")?.value?.trim() || "";
+
+  if (!preview || !previewText) return;
+
+  previewText.textContent = text || "Your headline appears here";
+
+  if (previewImage) {
+    if (imageUrl) {
+      previewImage.src = imageUrl;
+      previewImage.style.display = "block";
+      previewImage.onerror = () => {
+        previewImage.style.display = "none";
+      };
+    } else {
+      previewImage.removeAttribute("src");
+      previewImage.style.display = "none";
+    }
+  }
+
+  preview.style.display = text || imageUrl ? "block" : "none";
+}
+
+async function maybeResumeCheckout() {
+  if (!currentUser) return;
+  if (sessionStorage.getItem("autoCheckoutAfterLogin") !== "true") return;
+
+  const adText = document.getElementById("ad-text")?.value?.trim();
+  const adUrl = document.getElementById("ad-url")?.value?.trim();
+  if (!adText || !adUrl) return;
+
+  sessionStorage.removeItem("autoCheckoutAfterLogin");
+  const form = document.getElementById("campaign-form");
+  if (form) form.requestSubmit();
 }
 
 // ── Pending Checkout (After Auth) ────────────────────────────
@@ -457,10 +684,11 @@ async function handleCreateCampaign(e) {
 function saveFormState() {
   const adText = document.getElementById("ad-text")?.value;
   const adUrl = document.getElementById("ad-url")?.value;
+  const adImageUrl = document.getElementById("ad-image-url")?.value;
   const cpmCents = document.getElementById("cpm-rate")?.value;
-  if (adText || adUrl) {
+  if (adText || adUrl || adImageUrl) {
     sessionStorage.setItem("pendingCheckout", JSON.stringify({
-      adText, adUrl, cpmCents, tierIndex: selectedTierIndex
+      adText, adUrl, adImageUrl, cpmCents, tierIndex: selectedTierIndex
     }));
   }
 }
@@ -472,12 +700,16 @@ function checkPendingCheckout() {
       const data = JSON.parse(pending);
       const adTextEl = document.getElementById("ad-text");
       const adUrlEl = document.getElementById("ad-url");
+      const adImageEl = document.getElementById("ad-image-url");
       const cpmEl = document.getElementById("cpm-rate");
-      
+
       if (adTextEl) adTextEl.value = data.adText || "";
       if (adUrlEl) adUrlEl.value = data.adUrl || "";
+      if (adImageEl) adImageEl.value = data.adImageUrl || "";
       if (cpmEl) cpmEl.value = data.cpmCents || "1000";
       if (data.tierIndex !== undefined) selectedTierIndex = data.tierIndex;
+      renderTiers();
+      updateAdPreview();
       
     } catch (e) {}
     sessionStorage.removeItem("pendingCheckout");

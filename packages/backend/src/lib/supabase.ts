@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 /**
  * Singleton Supabase client for the HitBack backend.
@@ -39,6 +40,9 @@ export function getSupabase(): SupabaseClient {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    realtime: {
+      transport: ws as any,
     },
   });
 

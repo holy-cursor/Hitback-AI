@@ -173,10 +173,13 @@
 
       <div class="card form-card">
         <form id="campaign-form" onsubmit="handleCreateCampaign(event)">
-          
+
+          <p class="form-section-title">Your ad</p>
+
           <div class="form-group">
             <label class="form-label" for="ad-text">Ad headline <span class="required">*</span> <span class="label-hint">(max 60 chars)</span></label>
-            <input type="text" id="ad-text" name="adText" class="form-input" placeholder="Try our developer tool — 50% off today" maxlength="60" required oninput="updateAdPreview()">
+            <textarea id="ad-text" name="adText" class="form-input form-textarea" rows="2" placeholder="e.g. Get paid for your content — join Content Rewards" maxlength="60" required oninput="updateAdPreview()"></textarea>
+            <div class="form-hint"><span id="ad-text-count">0</span>/60 characters — shown as the main line in the editor ad panel.</div>
           </div>
 
           <div class="form-group">
@@ -196,8 +199,11 @@
 
           <div class="form-group">
             <label class="form-label" for="ad-url">Destination URL <span class="required">*</span></label>
-            <input type="url" id="ad-url" name="adUrl" class="form-input" placeholder="https://your-product.com" required>
+            <input type="url" id="ad-url" name="adUrl" class="form-input" placeholder="https://contentrewards.com" required>
+            <div class="form-hint">Where clicks go when a developer taps your ad.</div>
           </div>
+
+          <p class="form-section-title">Bidding &amp; budget</p>
 
           <div class="form-group">
             <label class="form-label" for="cpm-rate">CPM rate <span class="label-hint">(cents per 1,000 impressions)</span></label>

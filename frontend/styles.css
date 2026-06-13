@@ -259,7 +259,12 @@ body::after {
 .section-desc { font-size: 16px; color: var(--text-secondary); max-width: 540px; margin: 0 auto; }
 
 /* Form */
-.form-card { padding: 32px; box-shadow: var(--shadow-lg); }
+.form-card {
+  padding: 32px;
+  box-shadow: var(--shadow-lg);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
 .form-group { margin-bottom: 24px; }
 .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
 .form-label .label-hint { font-weight: 500; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
@@ -271,9 +276,51 @@ body::after {
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   transition: all var(--transition); outline: none;
 }
+/* Advertiser checkout — solid fields (glass inputs vanish on white cards) */
+.form-card .form-input,
+.form-card .form-textarea {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.form-card .form-textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.form-card .form-input::placeholder,
+.form-card .form-textarea::placeholder {
+  color: #94a3b8;
+}
+.form-card .form-input:hover,
+.form-card .form-textarea:hover {
+  border-color: #94a3b8;
+}
+.form-card .form-input:focus,
+.form-card .form-textarea:focus {
+  background: #fff;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
 .form-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); background: rgba(255,255,255,0.9); }
 .form-input::placeholder { color: var(--text-muted); }
 .form-hint { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.form-section-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
 
 /* Tier Grid */
 .tier-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }

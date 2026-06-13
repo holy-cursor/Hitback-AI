@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await checkAuth();
   await loadTiers();
   startQueuePolling();
+  updateAdPreview();
   await maybeResumeCheckout();
 });
 
@@ -643,8 +644,12 @@ function updateAdPreview() {
   const preview = document.getElementById("ad-preview");
   const previewText = document.getElementById("ad-preview-text");
   const previewImage = document.getElementById("ad-preview-image");
-  const text = document.getElementById("ad-text")?.value?.trim() || "";
+  const textEl = document.getElementById("ad-text");
+  const text = textEl?.value?.trim() || "";
   const imageUrl = document.getElementById("ad-image-url")?.value?.trim() || "";
+  const countEl = document.getElementById("ad-text-count");
+
+  if (countEl && textEl) countEl.textContent = String(textEl.value.length);
 
   if (!preview || !previewText) return;
 

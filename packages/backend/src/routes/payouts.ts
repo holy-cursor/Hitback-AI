@@ -36,7 +36,11 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
       // Create a new Connect Express account
       const account = await stripe.accounts.create({
         type: "express",
+        country: "US",
         email: req.user!.email,
+        capabilities: {
+          transfers: { requested: true },
+        },
         metadata: { hitback_user_id: userId },
       });
       connectId = account.id;
@@ -60,7 +64,15 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
     res.json({ onboardingUrl: accountLink.url });
   } catch (err) {
     console.error("[Payouts] Onboarding error:", err);
-    res.status(500).json({ error: "Failed to create onboarding link" });
+    const message = err instanceof Error ? err.message : "Failed to create onboarding link";
+    if (message.includes("signed up for Connect")) {
+      res.status(503).json({
+        error: "Stripe Connect is not enabled on your platform account yet.",
+        action: "Open dashboard.stripe.com/connect, complete setup (Express accounts), then try again.",
+      });
+      return;
+    }
+    res.status(500).json({ error: message || "Failed to create onboarding link" });
   }
 });
 

@@ -7,20 +7,26 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="hitback-api" content="https://api.hitback.xyz">
   <script src="auth-redirect.js"></script>
-  <script src="cache-bust.js?v=20260615d"></script>
-  <script src="api-config.js?v=20260615d"></script>
+  <script src="cache-bust.js?v=20260615f"></script>
+  <script src="api-config.js?v=20260615f"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260615d">
+  <link rel="stylesheet" href="styles.css?v=20260615f">
 </head>
 <body data-page="advertiser">
   <nav class="nav">
-    <div class="nav-container">
-      <a href="index.html" class="nav-logo">
-        <img src="favicon.png" alt="HitBack" class="site-logo" width="32" height="32">
-        <span>HitBack</span>
-      </a>
+    <div class="nav-container nav-container--portal">
+      <div class="nav-start">
+        <a href="index.html" class="nav-back" aria-label="Back to home">
+          <span class="nav-back-icon" aria-hidden="true">&larr;</span>
+          <span class="nav-back-label">Home</span>
+        </a>
+        <a href="index.html" class="nav-logo">
+          <img src="favicon.png" alt="HitBack" class="site-logo" width="32" height="32">
+          <span class="nav-logo-text">HitBack</span>
+        </a>
+      </div>
       <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-menu" onclick="toggleNavMenu()">
         <span class="nav-toggle-bar"></span>
         <span class="nav-toggle-bar"></span>
@@ -28,7 +34,6 @@
       </button>
       <div class="nav-menu" id="nav-menu">
         <div class="nav-pages">
-          <a href="index.html" class="nav-link">Home</a>
           <a href="developer.html" class="nav-link"><span class="nav-link-full">Developer Portal</span><span class="nav-link-short">Developers</span></a>
           <a href="advertiser.html" class="nav-link nav-link--active"><span class="nav-link-full">Advertiser</span><span class="nav-link-short">Advertise</span></a>
         </div>
@@ -180,7 +185,7 @@
   </div>
 
   <div id="toast-container" class="toast-container"></div>
-  <script src="auth.js?v=20260615d"></script>
-  <script src="app.js?v=20260615d"></script>
+  <script src="auth.js?v=20260615f"></script>
+  <script src="app.js?v=20260615f"></script>
 </body>
 </html>

@@ -74,6 +74,26 @@ body {
 .nav-pages {
   display: flex; align-items: center; gap: 16px;
 }
+.nav-start {
+  display: flex; align-items: center; gap: 12px;
+  min-width: 0; flex-shrink: 0;
+}
+.nav-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600; color: var(--text-secondary);
+  text-decoration: none; white-space: nowrap;
+  padding: 6px 10px; margin: -6px 0 -6px -10px;
+  border-radius: 8px;
+  transition: color var(--transition), background var(--transition);
+}
+.nav-back:hover {
+  color: var(--text-primary);
+  background: #f8fafc;
+}
+.nav-back-icon {
+  font-size: 18px; line-height: 1;
+  font-weight: 400;
+}
 .nav-logo {
   display: flex; align-items: center; gap: 10px;
   font-weight: 700; font-size: 18px; color: var(--text-primary);
@@ -745,6 +765,12 @@ body.modal-open { overflow: hidden; }
     padding: 10px 16px;
     gap: 12px;
     position: relative;
+  }
+  .nav-container--portal .nav-logo-text { display: none; }
+  .nav-back {
+    padding: 8px 10px;
+    margin: 0;
+    font-size: 15px;
   }
   .nav-toggle { display: flex; margin-left: auto; }
   .nav-menu {

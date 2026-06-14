@@ -123,6 +123,10 @@ router.post("/login", async (req: Request, res: Response) => {
 
   try {
     const sb = getSupabase();
+    // Supabase often does not deliver confirmation emails (rate limits / no SMTP).
+    // Auto-confirm before sign-in so users are never stuck waiting for mail.
+    await confirmUserEmail(sb, email);
+
     let { data, error } = await sb.auth.signInWithPassword({ email, password });
 
     if (

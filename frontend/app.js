@@ -150,7 +150,7 @@ function setSignInModalMode(mode) {
   if (subtitle) {
     subtitle.textContent = mode === "signin"
       ? "Sign in to track earnings, manage campaigns, and withdraw payouts."
-      : "Start earning from AI wait-states. Free for developers.";
+      : "No confirmation email needed — you'll be signed in right away.";
   }
   if (submitBtn) submitBtn.textContent = mode === "signin" ? "Sign In" : "Create Account";
   if (passwordInput) {
@@ -251,17 +251,6 @@ async function handleSignUpFromModal() {
         errorEl.textContent = data.error || "Could not create account";
         errorEl.style.display = "block";
       }
-      return;
-    }
-
-    if (data.needsConfirmation) {
-      if (errorEl) {
-        errorEl.style.display = "block";
-        errorEl.style.color = "var(--accent-green, #16a34a)";
-        errorEl.textContent = data.message || "Check your email and click the confirmation link, then sign in.";
-      }
-      showToast(data.message || "Check your email to confirm your account.", "success");
-      setSignInModalMode("signin");
       return;
     }
 
@@ -426,16 +415,26 @@ function renderEarningsHistory(entries, container) {
 }
 
 async function handleConnectOnboard() {
+  const connectBtn = document.getElementById("stripe-connect-btn");
+  if (connectBtn) connectBtn.disabled = true;
   try {
     const res = await apiFetch("/api/payouts/connect-onboard", { method: "POST" });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.onboardingUrl) window.location.href = data.onboardingUrl;
-    } else {
-      showToast("Stripe Connect not available in demo mode", "error");
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.onboardingUrl) {
+      window.location.href = data.onboardingUrl;
+      return;
     }
+    if (res.status === 401) {
+      showToast("Sign in first, then connect Stripe.", "error");
+      openSignInModal();
+      return;
+    }
+    const msg = [data.error, data.action].filter(Boolean).join(" ");
+    showToast(msg || "Could not start Stripe setup", "error");
   } catch {
     showToast("Network error", "error");
+  } finally {
+    if (connectBtn) connectBtn.disabled = false;
   }
 }
 

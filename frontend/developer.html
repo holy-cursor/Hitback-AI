@@ -7,12 +7,12 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="hitback-api" content="https://api.hitback.xyz">
   <script src="auth-redirect.js"></script>
-  <script src="cache-bust.js?v=20260615g"></script>
-  <script src="api-config.js?v=20260615g"></script>
+  <script src="cache-bust.js?v=20260615h"></script>
+  <script src="api-config.js?v=20260615h"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260615g">
+  <link rel="stylesheet" href="styles.css?v=20260615h">
 </head>
 <body data-page="developer">
   <nav class="nav">
@@ -71,6 +71,7 @@
             <span class="balance-sub">$10.00 minimum to withdraw</span>
             <div class="earnings-action-btns">
               <button id="stripe-connect-btn" class="btn btn-dark-action" onclick="handleConnectOnboard()">Connect Stripe</button>
+              <button id="stripe-manage-btn" class="btn btn-dark-action" onclick="handleStripeManage()" style="display: none;">Manage payouts</button>
               <button id="withdraw-btn" class="btn btn-dark-action" onclick="handleWithdraw()" disabled>Withdraw</button>
             </div>
           </div>
@@ -153,7 +154,7 @@
   </div>
 
   <div id="toast-container" class="toast-container"></div>
-  <script src="auth.js?v=20260615g"></script>
-  <script src="app.js?v=20260615g"></script>
+  <script src="auth.js?v=20260615h"></script>
+  <script src="app.js?v=20260615h"></script>
 </body>
 </html>

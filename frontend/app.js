@@ -429,15 +429,29 @@ async function loadDevDashboard() {
     if (lifetimeEl) lifetimeEl.textContent = data.lifetimeEarningsDisplay || "$0.00";
     if (withdrawBtn) withdrawBtn.disabled = !data.canWithdraw;
 
+    const manageBtn = document.getElementById("stripe-manage-btn");
     if (statusEl) {
       if (data.stripeConnected) {
-        statusEl.textContent = "Stripe Connected";
+        statusEl.textContent = "Payouts active";
         statusEl.className = "status-badge status-success";
         if (connectBtn) connectBtn.style.display = "none";
-      } else {
-        statusEl.textContent = "Not Connected";
+        if (manageBtn) manageBtn.style.display = "inline-flex";
+      } else if (data.stripePending) {
+        statusEl.textContent = "Setup incomplete";
         statusEl.className = "status-badge status-warning";
-        if (connectBtn) connectBtn.style.display = "inline-flex";
+        if (connectBtn) {
+          connectBtn.style.display = "inline-flex";
+          connectBtn.textContent = "Complete Stripe setup";
+        }
+        if (manageBtn) manageBtn.style.display = "none";
+      } else {
+        statusEl.textContent = "Not connected";
+        statusEl.className = "status-badge status-warning";
+        if (connectBtn) {
+          connectBtn.style.display = "inline-flex";
+          connectBtn.textContent = "Connect Stripe";
+        }
+        if (manageBtn) manageBtn.style.display = "none";
       }
     }
 
@@ -497,9 +511,21 @@ async function handleConnectOnboard() {
       window.location.href = data.onboardingUrl;
       return;
     }
+    if (res.ok && data.alreadyConnected && data.dashboardUrl) {
+      window.open(data.dashboardUrl, "_blank", "noopener,noreferrer");
+      showToast("Stripe payouts are already connected.", "success");
+      await loadDevDashboard();
+      return;
+    }
     if (res.status === 401) {
       showToast("Sign in first, then connect Stripe.", "error");
       openSignInModal();
+      return;
+    }
+    if (res.status === 503 && data.setupUrl) {
+      const msg = [data.error, data.action].filter(Boolean).join(" ");
+      showToast(msg, "error");
+      window.open(data.setupUrl, "_blank", "noopener,noreferrer");
       return;
     }
     const msg = [data.error, data.action].filter(Boolean).join(" ");
@@ -508,6 +534,24 @@ async function handleConnectOnboard() {
     showToast("Network error", "error");
   } finally {
     if (connectBtn) connectBtn.disabled = false;
+  }
+}
+
+async function handleStripeManage() {
+  try {
+    const res = await apiFetch("/api/payouts/connect-onboard", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.dashboardUrl) {
+      window.open(data.dashboardUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (res.ok && data.onboardingUrl) {
+      window.location.href = data.onboardingUrl;
+      return;
+    }
+    showToast(data.error || "Could not open Stripe dashboard", "error");
+  } catch {
+    showToast("Network error", "error");
   }
 }
 
@@ -883,6 +927,7 @@ function checkConnectReturn() {
     if (currentUser) loadDevDashboard();
   } else if (urlParams.get("connect") === "refresh") {
     history.replaceState({}, "", "developer.html");
+    if (currentUser) handleConnectOnboard();
   }
 }
 

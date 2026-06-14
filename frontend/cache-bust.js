@@ -4,7 +4,7 @@
  * even after Ctrl+Shift+R.
  */
 (function bustStaleCache() {
-  const VERSION = "20260615g";
+  const VERSION = "20260615h";
   const VERSION_KEY = "hitback_app_version";
   const RELOAD_KEY = "hitback_cache_reload";
 

@@ -1,15 +1,28 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/requireAuth";
 import { isStripeConfigured, getStripe } from "../lib/stripe";
+import { fetchConnectAccountStatus } from "../lib/stripeConnect";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
 import { getPortalUrl } from "../lib/portalUrl";
 
 const router = Router();
 
+function connectNotEnabledResponse(res: Response): void {
+  res.status(503).json({
+    error: "Stripe Connect is not enabled on the HitBack platform account yet.",
+    action:
+      "The platform owner must open dashboard.stripe.com/connect, choose Express accounts, and complete setup.",
+    setupUrl: "https://dashboard.stripe.com/connect",
+  });
+}
+
+function isConnectNotEnabledError(message: string): boolean {
+  return message.includes("signed up for Connect");
+}
+
 /**
  * POST /api/payouts/connect-onboard
  * Creates a Stripe Connect onboarding link for developers to receive payouts.
- * Requires authentication.
  */
 router.post("/connect-onboard", requireAuth, async (req: Request, res: Response) => {
   if (!isStripeConfigured() || !isSupabaseConfigured()) {
@@ -23,7 +36,6 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
     const userId = req.user!.id;
     const portalUrl = getPortalUrl();
 
-    // Check if user already has a Connect account
     const { data: profile } = await sb
       .from("user_profiles")
       .select("stripe_connect_id")
@@ -33,7 +45,6 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
     let connectId = profile?.stripe_connect_id;
 
     if (!connectId) {
-      // Create a new Connect Express account
       const account = await stripe.accounts.create({
         type: "express",
         country: "US",
@@ -41,18 +52,29 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
         capabilities: {
           transfers: { requested: true },
         },
+        business_profile: {
+          name: "HitBack Developer",
+        },
         metadata: { hitback_user_id: userId },
       });
       connectId = account.id;
 
-      // Save to profile
       await sb
         .from("user_profiles")
         .update({ stripe_connect_id: connectId })
         .eq("id", userId);
     }
 
-    // Create an onboarding link
+    const status = await fetchConnectAccountStatus(stripe, connectId);
+    if (status.readyForPayouts) {
+      const loginLink = await stripe.accounts.createLoginLink(connectId);
+      res.json({
+        alreadyConnected: true,
+        dashboardUrl: loginLink.url,
+      });
+      return;
+    }
+
     const accountLink = await stripe.accountLinks.create({
       account: connectId,
       refresh_url: `${portalUrl}/developer.html?connect=refresh`,
@@ -65,11 +87,8 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
   } catch (err) {
     console.error("[Payouts] Onboarding error:", err);
     const message = err instanceof Error ? err.message : "Failed to create onboarding link";
-    if (message.includes("signed up for Connect")) {
-      res.status(503).json({
-        error: "Stripe Connect is not enabled on your platform account yet.",
-        action: "Open dashboard.stripe.com/connect, complete setup (Express accounts), then try again.",
-      });
+    if (isConnectNotEnabledError(message)) {
+      connectNotEnabledResponse(res);
       return;
     }
     res.status(500).json({ error: message || "Failed to create onboarding link" });
@@ -118,6 +137,24 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
       .reduce((sum, e) => sum + e.amount_cents, 0);
     const totalImpressions = rows.filter((e) => e.source === "impression").length;
 
+    let connectStatus = {
+      hasAccount: false,
+      readyForPayouts: false,
+      requiresAction: false,
+      payoutsEnabled: false,
+    };
+
+    if (isStripeConfigured() && profile?.stripe_connect_id) {
+      const stripe = getStripe();
+      const status = await fetchConnectAccountStatus(stripe, profile.stripe_connect_id);
+      connectStatus = {
+        hasAccount: status.hasAccount,
+        readyForPayouts: status.readyForPayouts,
+        requiresAction: status.requiresAction,
+        payoutsEnabled: status.payoutsEnabled,
+      };
+    }
+
     res.json({
       balanceCents,
       balanceDisplay: `$${(balanceCents / 100).toFixed(2)}`,
@@ -127,8 +164,10 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
       lifetimeEarningsCents: balanceCents,
       lifetimeEarningsDisplay: `$${(balanceCents / 100).toFixed(2)}`,
       payoutMinimumCents: 1000,
-      canWithdraw: balanceCents >= 1000,
-      stripeConnected: !!profile?.stripe_connect_id,
+      canWithdraw: balanceCents >= 1000 && connectStatus.readyForPayouts,
+      stripeConnected: connectStatus.readyForPayouts,
+      stripePending: connectStatus.hasAccount && !connectStatus.readyForPayouts,
+      stripeRequiresAction: connectStatus.requiresAction,
       recentEarnings: rows.slice(0, 15).map((e) => ({
         amountCents: e.amount_cents,
         amountDisplay: `$${(e.amount_cents / 100).toFixed(2)}`,
@@ -144,8 +183,6 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
 
 /**
  * GET /api/payouts/balance
- * Returns the developer's current earnings balance.
- * Requires authentication.
  */
 router.get("/balance", requireAuth, async (req: Request, res: Response) => {
   if (!isSupabaseConfigured()) {
@@ -157,7 +194,6 @@ router.get("/balance", requireAuth, async (req: Request, res: Response) => {
     const sb = getSupabase();
     const userId = req.user!.id;
 
-    // Sum all earnings for this developer
     const { data: earnings, error } = await sb
       .from("earnings")
       .select("amount_cents")
@@ -169,15 +205,12 @@ router.get("/balance", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    const totalCents = (earnings || []).reduce(
-      (sum, e) => sum + e.amount_cents,
-      0
-    );
+    const totalCents = (earnings || []).reduce((sum, e) => sum + e.amount_cents, 0);
 
     res.json({
       balanceCents: totalCents,
       balanceDisplay: `$${(totalCents / 100).toFixed(2)}`,
-      payoutMinimumCents: 1000, // $10 minimum
+      payoutMinimumCents: 1000,
       canWithdraw: totalCents >= 1000,
     });
   } catch (err) {
@@ -189,8 +222,6 @@ router.get("/balance", requireAuth, async (req: Request, res: Response) => {
 /**
  * POST /api/payouts/withdraw
  * Triggers a payout to the developer's Stripe Connect account.
- * Minimum $10 balance required.
- * Requires authentication.
  */
 router.post("/withdraw", requireAuth, async (req: Request, res: Response) => {
   if (!isStripeConfigured() || !isSupabaseConfigured()) {
@@ -203,7 +234,6 @@ router.post("/withdraw", requireAuth, async (req: Request, res: Response) => {
     const sb = getSupabase();
     const userId = req.user!.id;
 
-    // Check Connect account
     const { data: profile } = await sb
       .from("user_profiles")
       .select("stripe_connect_id")
@@ -215,16 +245,20 @@ router.post("/withdraw", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Calculate balance
+    const connectStatus = await fetchConnectAccountStatus(stripe, profile.stripe_connect_id);
+    if (!connectStatus.readyForPayouts) {
+      res.status(400).json({
+        error: "Stripe payout setup is incomplete. Finish Connect onboarding first.",
+      });
+      return;
+    }
+
     const { data: earnings } = await sb
       .from("earnings")
       .select("amount_cents")
       .eq("developer_id", userId);
 
-    const totalCents = (earnings || []).reduce(
-      (sum, e) => sum + e.amount_cents,
-      0
-    );
+    const totalCents = (earnings || []).reduce((sum, e) => sum + e.amount_cents, 0);
 
     if (totalCents < 1000) {
       res.status(400).json({
@@ -233,7 +267,6 @@ router.post("/withdraw", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Create a transfer to the Connect account
     const transfer = await stripe.transfers.create({
       amount: totalCents,
       currency: "usd",
@@ -241,11 +274,7 @@ router.post("/withdraw", requireAuth, async (req: Request, res: Response) => {
       metadata: { hitback_user_id: userId },
     });
 
-    // Zero out earnings (in production, use a ledger/payout table instead)
-    await sb
-      .from("earnings")
-      .delete()
-      .eq("developer_id", userId);
+    await sb.from("earnings").delete().eq("developer_id", userId);
 
     console.log(
       `[Payouts] Transfer of $${(totalCents / 100).toFixed(2)} to ${profile.stripe_connect_id}`
@@ -259,7 +288,12 @@ router.post("/withdraw", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[Payouts] Withdraw error:", err);
-    res.status(500).json({ error: "Failed to process payout" });
+    const message = err instanceof Error ? err.message : "Failed to process payout";
+    if (isConnectNotEnabledError(message)) {
+      connectNotEnabledResponse(res);
+      return;
+    }
+    res.status(500).json({ error: message || "Failed to process payout" });
   }
 });
 

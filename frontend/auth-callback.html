@@ -5,42 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Authenticating — HitBack</title>
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="apple-touch-icon" href="favicon.png">
   <meta name="hitback-api" content="https://hitback-api.fly.dev">
-  <script src="api-config.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="api-config.js?v=20260614d"></script>
+  <script src="auth.js?v=20260614d"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="login-page">
-  <div class="bg-grid" aria-hidden="true"></div>
-  <div class="bg-glow bg-glow--1" aria-hidden="true"></div>
-
   <main class="login-container">
-    <div class="login-card" style="padding: 48px 32px;">
-      <div class="login-logo">
-        <img src="favicon.png" alt="HitBack" class="site-logo site-logo--lg">
-      </div>
+    <div class="login-card" style="padding: 48px 32px; text-align: center;">
       <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Authenticating…</h2>
-      <p style="font-size: 13px; color: var(--text-muted);" id="status-text">Exchanging tokens with Supabase</p>
-      <div style="margin-top: 20px;">
-        <div style="width: 32px; height: 32px; border: 3px solid var(--border-subtle); border-top-color: var(--accent-purple); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;"></div>
-      </div>
-      <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+      <p style="font-size: 13px; color: var(--text-muted);" id="status-text">Completing sign-in</p>
     </div>
   </main>
 
   <script>
-    /**
-     * OAuth Callback Handler
-     *
-     * Supabase redirects here with tokens in the URL hash:
-     *   #access_token=xxx&refresh_token=yyy&...
-     *
-     * We extract them and POST to /auth/session to set the HTTP-only cookie,
-     * then redirect to the dashboard.
-     */
     (async function handleCallback() {
       const statusEl = document.getElementById("status-text");
 
@@ -51,7 +29,7 @@
         const refreshToken = params.get("refresh_token");
 
         if (!accessToken || !refreshToken) {
-          statusEl.textContent = "Missing tokens. Redirecting to login…";
+          statusEl.textContent = "Missing tokens. Redirecting…";
           setTimeout(() => { window.location.href = "index.html"; }, 2000);
           return;
         }
@@ -68,13 +46,20 @@
           }),
         });
 
-        if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.accessToken) {
+          saveAuthToken(data.accessToken);
           statusEl.textContent = "Success! Redirecting…";
-          window.location.href = "index.html";
-        } else {
-          statusEl.textContent = "Authentication failed. Redirecting…";
-          setTimeout(() => { window.location.href = "index.html"; }, 2000);
+          const hasPending =
+            sessionStorage.getItem("pendingCheckout") ||
+            sessionStorage.getItem("autoCheckoutAfterLogin");
+          window.location.href = hasPending ? "index.html#advertisers" : "index.html";
+          return;
         }
+
+        statusEl.textContent = data.error || "Authentication failed. Redirecting…";
+        setTimeout(() => { window.location.href = "index.html"; }, 2000);
       } catch (err) {
         statusEl.textContent = "Network error. Redirecting…";
         console.error("[Auth Callback]", err);

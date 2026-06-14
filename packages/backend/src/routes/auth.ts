@@ -120,6 +120,7 @@ router.post("/login", async (req: Request, res: Response) => {
           data.user.user_metadata?.full_name ||
           data.user.email?.split("@")[0],
       },
+      accessToken: data.session.access_token,
     });
   } catch (err) {
     console.error("[Auth] Login error:", err);
@@ -174,6 +175,7 @@ router.post("/signup", async (req: Request, res: Response) => {
         email: data.user.email,
         name: data.user.email?.split("@")[0],
       },
+      accessToken: data.session.access_token,
     });
   } catch (err) {
     console.error("[Auth] Signup error:", err);
@@ -227,6 +229,7 @@ router.post("/session", async (req: Request, res: Response) => {
           data.user.user_metadata?.full_name ||
           data.user.email?.split("@")[0],
       },
+      accessToken: access_token,
     });
   } catch (err) {
     console.error("[Auth] Session error:", err);

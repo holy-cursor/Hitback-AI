@@ -27,12 +27,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function checkAuth() {
   try {
-    const res = await fetch(`${API}/auth/me`, { credentials: "include" });
+    const res = await apiFetch("/auth/me");
     if (res.ok) {
       const data = await res.json();
       currentUser = data.user;
       setupLoggedInState();
     } else {
+      if (res.status === 401) clearAuthToken();
       setupLoggedOutState();
     }
   } catch {
@@ -133,10 +134,9 @@ async function handleEmailSignIn(event) {
   if (errorEl) errorEl.style.display = "none";
 
   try {
-    const res = await fetch(`${API}/auth/login`, {
+    const res = await apiFetch("/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
 
@@ -149,6 +149,8 @@ async function handleEmailSignIn(event) {
       }
       return;
     }
+
+    if (data.accessToken) saveAuthToken(data.accessToken);
 
     closeSignInModal();
     currentUser = data.user;
@@ -182,10 +184,9 @@ async function handleSignUpFromModal() {
   if (errorEl) errorEl.style.display = "none";
 
   try {
-    const res = await fetch(`${API}/auth/signup`, {
+    const res = await apiFetch("/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
 
@@ -204,6 +205,8 @@ async function handleSignUpFromModal() {
       return;
     }
 
+    if (data.accessToken) saveAuthToken(data.accessToken);
+
     closeSignInModal();
     currentUser = data.user;
     setupLoggedInState();
@@ -219,7 +222,8 @@ async function handleSignUpFromModal() {
 }
 
 function handleLogout() {
-  fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" })
+  clearAuthToken();
+  apiFetch("/auth/logout", { method: "POST" })
     .finally(() => { window.location.reload(); });
 }
 
@@ -269,7 +273,7 @@ async function loadDevDashboard() {
   const connectBtn = document.getElementById("stripe-connect-btn");
 
   try {
-    const res = await fetch(`${API}/api/payouts/dashboard`, { credentials: "include" });
+    const res = await apiFetch("/api/payouts/dashboard");
     if (!res.ok) {
       renderEmptyDashboard();
       return;
@@ -343,7 +347,7 @@ function renderEarningsHistory(entries, container) {
 
 async function handleConnectOnboard() {
   try {
-    const res = await fetch(`${API}/api/payouts/connect-onboard`, { method: "POST", credentials: "include" });
+    const res = await apiFetch("/api/payouts/connect-onboard", { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       if (data.onboardingUrl) window.location.href = data.onboardingUrl;
@@ -359,7 +363,7 @@ async function handleWithdraw() {
   const btn = document.getElementById("withdraw-btn");
   if (btn) btn.disabled = true;
   try {
-    const res = await fetch(`${API}/api/payouts/withdraw`, { method: "POST", credentials: "include" });
+    const res = await apiFetch("/api/payouts/withdraw", { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       showToast(`Withdrawn ${data.amountDisplay} to Stripe!`, "success");
@@ -381,7 +385,7 @@ async function loadAdvertiserStats() {
   if (!dashboard || !currentUser) return;
 
   try {
-    const res = await fetch(`${API}/api/advertiser/stats`, { credentials: "include" });
+    const res = await apiFetch("/api/advertiser/stats");
     if (!res.ok) {
       dashboard.style.display = "none";
       return;
@@ -426,10 +430,9 @@ async function toggleCampaignStatus(campaignId, currentStatus) {
   if (btn) btn.disabled = true;
 
   try {
-    const res = await fetch(`${API}/api/advertiser/campaigns/${campaignId}`, {
+    const res = await apiFetch(`/api/advertiser/campaigns/${campaignId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ status: nextStatus }),
     });
 
@@ -455,7 +458,7 @@ async function loadActiveCampaigns() {
   if (!container || !list) return;
 
   try {
-    const res = await fetch(`${API}/api/advertiser/campaigns`, { credentials: "include" });
+    const res = await apiFetch("/api/advertiser/campaigns");
     if (res.ok) {
       const data = await res.json();
       const campaigns = (data.campaigns || []).filter(
@@ -594,10 +597,9 @@ async function handleCreateCampaign(e) {
   btn.textContent = "Processing...";
 
   try {
-    const res = await fetch(`${API}/api/advertiser/campaigns`, {
+    const res = await apiFetch("/api/advertiser/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({
         adText,
         adUrl,
@@ -609,10 +611,9 @@ async function handleCreateCampaign(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to create campaign");
 
-    const checkoutRes = await fetch(`${API}/api/billing/checkout`, {
+    const checkoutRes = await apiFetch("/api/billing/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ campaignId: data.campaign.id, tierIndex: selectedTierIndex }),
     });
 

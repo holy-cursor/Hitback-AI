@@ -23,7 +23,7 @@
       const hasPending =
         sessionStorage.getItem("pendingCheckout") ||
         sessionStorage.getItem("autoCheckoutAfterLogin");
-      window.location.href = hasPending ? "index.html#advertisers" : "index.html";
+      window.location.href = hasPending ? "advertiser.html" : "index.html";
     }
 
     async function finishAuth(res) {

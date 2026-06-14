@@ -73,8 +73,8 @@ router.post("/checkout", requireAuth, async (req: Request, res: Response) => {
         impressions: tier.impressions.toString(),
         userId: req.user?.id || "",
       },
-      success_url: `${portalUrl}/index.html?checkout=success&campaign=${campaignId}`,
-      cancel_url: `${portalUrl}/index.html?checkout=cancelled`,
+      success_url: `${portalUrl}/advertiser.html?checkout=success&campaign=${campaignId}`,
+      cancel_url: `${portalUrl}/advertiser.html?checkout=cancelled`,
     });
 
     console.log(
@@ -117,7 +117,7 @@ router.get("/portal", requireAuth, async (req: Request, res: Response) => {
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${getPortalUrl()}/index.html`,
+      return_url: `${getPortalUrl()}/advertiser.html`,
     });
 
     res.json({ portalUrl: portalSession.url });

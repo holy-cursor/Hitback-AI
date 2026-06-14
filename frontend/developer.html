@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <title>HitBack — Get Paid For Waiting</title>
+  <title>Developer Portal — HitBack</title>
   <link rel="icon" type="image/png" href="favicon.png">
-  <meta name="description" content="Turn AI code wait-states into ad real estate. Earn 60% of the revenue.">
   <meta name="hitback-api" content="https://hitback-api.fly.dev">
   <script src="auth-redirect.js"></script>
   <script src="cache-bust.js?v=20260615a"></script>
@@ -16,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260615a">
 </head>
-<body data-page="home">
+<body data-page="developer">
   <nav class="nav">
     <div class="nav-container">
       <a href="index.html" class="nav-logo">
@@ -24,8 +22,8 @@
         <span>HitBack</span>
       </a>
       <div class="nav-links">
-        <a href="index.html" class="nav-link nav-link--active">Home</a>
-        <a href="developer.html" class="nav-link">Developer Portal</a>
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="developer.html" class="nav-link nav-link--active">Developer Portal</a>
         <a href="advertiser.html" class="nav-link">Advertiser</a>
         <div id="auth-section">
           <button class="btn btn-secondary btn-sm" onclick="handleLogin()">Sign In</button>
@@ -34,49 +32,66 @@
     </div>
   </nav>
 
-  <main class="container">
-    <section class="section-hero">
-      <h1 class="hero-title">Get paid for waiting.</h1>
-      <p class="hero-subtitle">
-        We turned AI code wait-states into ad real estate.<br>
-        <span class="highlight-green">60% of the revenue</span> goes to you.
-      </p>
-
-      <div class="home-portal-cards">
-        <a href="developer.html" class="card home-portal-card">
-          <span class="section-label text-green">For developers</span>
-          <h2 class="home-portal-title">Earnings portal</h2>
-          <p>Install the extension, track impressions, connect Stripe, and withdraw your share.</p>
-          <span class="home-portal-link">Open developer portal &rarr;</span>
-        </a>
-        <a href="advertiser.html" class="card home-portal-card">
-          <span class="section-label text-blue">For advertisers</span>
-          <h2 class="home-portal-title">Campaign dashboard</h2>
-          <p>Launch ads in AI editors, set your CPM bid, and track impressions and clicks.</p>
-          <span class="home-portal-link">Open advertiser portal &rarr;</span>
-        </a>
+  <main class="container portal-page">
+    <section class="section-earnings portal-section">
+      <div class="earnings-header">
+        <span class="section-label text-green">Developer portal</span>
+        <h1 class="section-title">Your earnings</h1>
+        <p class="section-desc">Track impressions, balance, and withdraw your 60% revenue share. Use the same account as the VS Code extension.</p>
       </div>
 
-      <div class="install-block">
-        <a href="vscode:extension/hitback.hitback-extension" class="btn btn-primary btn-large btn-install">
-          Install the VS Code extension
-        </a>
+      <div class="portal-cta-row">
+        <a href="vscode:extension/hitback.hitback-extension" class="btn btn-primary">Install extension</a>
       </div>
-    </section>
 
-    <section class="section-market">
-      <div class="market-header">
-        <span class="section-label text-blue">LIVE CPM MARKET</span>
-        <h2 class="section-title">Top bids right now</h2>
+      <div id="earnings-logged-out" class="card info-card">
+        <p>Sign in to view your balance, impression count, and payout history.</p>
+        <button class="btn btn-outline" onclick="handleLogin()">Sign In to View Earnings</button>
       </div>
-      <div class="card market-card">
-        <div id="queue-list" class="queue-list">
-          <div class="queue-empty">Loading market data...</div>
+
+      <div id="earnings-dashboard" style="display: none;">
+        <div class="earnings-hero card dark-card">
+          <div class="earnings-hero-top">
+            <span class="label">AVAILABLE BALANCE</span>
+            <span id="earnings-balance" class="earnings-balance-big">$0.00</span>
+          </div>
+          <div class="earnings-hero-actions">
+            <span class="balance-sub">$10.00 minimum to withdraw</span>
+            <div class="earnings-action-btns">
+              <button id="stripe-connect-btn" class="btn btn-dark-action" onclick="handleConnectOnboard()">Connect Stripe</button>
+              <button id="withdraw-btn" class="btn btn-dark-action" onclick="handleWithdraw()" disabled>Withdraw</button>
+            </div>
+          </div>
+          <div class="earnings-stripe-row">
+            <span class="label">PAYOUT STATUS</span>
+            <span id="dev-stripe-status" class="status-badge status-warning">Not Connected</span>
+          </div>
+        </div>
+
+        <div class="earnings-stats-grid">
+          <div class="card stat-card">
+            <span class="stat-label">THIS MONTH</span>
+            <span id="stat-month" class="stat-value">$0.00</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">PAID IMPRESSIONS</span>
+            <span id="stat-impressions" class="stat-value">0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">LIFETIME EARNED</span>
+            <span id="stat-lifetime" class="stat-value">$0.00</span>
+          </div>
+        </div>
+
+        <div class="card earnings-history-card">
+          <div class="card-header earnings-history-header">
+            <span class="label">RECENT EARNINGS</span>
+          </div>
+          <div id="earnings-history" class="earnings-history-list">
+            <div class="earnings-empty">No earnings yet. Install the extension and run your AI agent to start earning.</div>
+          </div>
         </div>
       </div>
-      <p class="section-desc text-center" style="margin-top: 16px;">
-        <a href="advertiser.html" class="text-link">Bid on this inventory &rarr;</a>
-      </p>
     </section>
   </main>
 
@@ -103,7 +118,7 @@
           <button type="button" id="signin-tab-signup" class="modal-mode-tab" role="tab" aria-selected="false" onclick="setSignInModalMode('signup')">Create account</button>
         </div>
         <h2 id="signin-title" class="modal-title">Welcome back</h2>
-        <p id="signin-subtitle" class="modal-subtitle">One account for the extension, earnings, and ad campaigns.</p>
+        <p id="signin-subtitle" class="modal-subtitle">Sign in to track earnings and withdraw payouts.</p>
         <button type="button" class="modal-google-btn" onclick="handleGoogleSignIn()">
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           <span>Continue with Google</span>

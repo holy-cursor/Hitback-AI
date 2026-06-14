@@ -11,16 +11,31 @@ let selectedTierIndex = 0;
 let tiers = [];
 let signInModalMode = "signin";
 
+function getPage() {
+  return document.body.dataset.page || "home";
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
-  checkPendingCheckout();
+  const page = getPage();
+
+  if (page === "advertiser") {
+    checkPendingCheckout();
+  }
 
   await checkAuth();
-  await loadTiers();
-  startQueuePolling();
-  updateAdPreview();
-  await maybeResumeCheckout();
+
+  if (page === "home") {
+    startQueuePolling();
+  } else if (page === "advertiser") {
+    checkCheckoutReturn();
+    await loadTiers();
+    updateAdPreview();
+    await maybeResumeCheckout();
+  } else if (page === "developer") {
+    checkConnectReturn();
+  }
 });
 
 // ── Auth ─────────────────────────────────────────────────────
@@ -234,7 +249,6 @@ function handleLogout() {
 }
 
 function setupLoggedInState() {
-  // Update Nav
   const authSection = document.getElementById("auth-section");
   if (authSection && currentUser) {
     authSection.innerHTML = `
@@ -245,25 +259,46 @@ function setupLoggedInState() {
     `;
   }
 
-  document.getElementById("dev-logged-in-teaser").style.display = "block";
-  document.getElementById("dev-logged-out").style.display = "none";
-  document.getElementById("earnings-logged-out").style.display = "none";
-  document.getElementById("earnings-dashboard").style.display = "block";
-  document.getElementById("checkout-login-hint").style.display = "none";
+  const page = getPage();
 
-  loadDevDashboard();
-  loadAdvertiserStats();
-  loadActiveCampaigns();
+  if (page === "developer") {
+    const loggedOut = document.getElementById("earnings-logged-out");
+    const dashboard = document.getElementById("earnings-dashboard");
+    if (loggedOut) loggedOut.style.display = "none";
+    if (dashboard) dashboard.style.display = "block";
+    loadDevDashboard();
+  }
+
+  if (page === "advertiser") {
+    const advLoggedOut = document.getElementById("advertiser-logged-out");
+    const loginHint = document.getElementById("checkout-login-hint");
+    if (advLoggedOut) advLoggedOut.style.display = "none";
+    if (loginHint) loginHint.style.display = "none";
+    loadAdvertiserStats();
+    loadActiveCampaigns();
+  }
 }
 
 function setupLoggedOutState() {
-  document.getElementById("dev-logged-in-teaser").style.display = "none";
-  document.getElementById("dev-logged-out").style.display = "block";
-  document.getElementById("earnings-logged-out").style.display = "block";
-  document.getElementById("earnings-dashboard").style.display = "none";
-  document.getElementById("checkout-login-hint").style.display = "block";
-  document.getElementById("advertiser-campaigns").style.display = "none";
-  document.getElementById("advertiser-dashboard").style.display = "none";
+  const page = getPage();
+
+  if (page === "developer") {
+    const loggedOut = document.getElementById("earnings-logged-out");
+    const dashboard = document.getElementById("earnings-dashboard");
+    if (loggedOut) loggedOut.style.display = "block";
+    if (dashboard) dashboard.style.display = "none";
+  }
+
+  if (page === "advertiser") {
+    const advLoggedOut = document.getElementById("advertiser-logged-out");
+    const loginHint = document.getElementById("checkout-login-hint");
+    const advDashboard = document.getElementById("advertiser-dashboard");
+    const campaigns = document.getElementById("advertiser-campaigns");
+    if (advLoggedOut) advLoggedOut.style.display = "block";
+    if (loginHint) loginHint.style.display = "block";
+    if (advDashboard) advDashboard.style.display = "none";
+    if (campaigns) campaigns.style.display = "none";
+  }
 }
 
 // ── Developer Earnings Portal ────────────────────────────────
@@ -714,6 +749,32 @@ function saveFormState() {
   }
 }
 
+function checkCheckoutReturn() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("checkout") === "success") {
+    showToast("Payment successful! Campaign is now active.", "success");
+    history.replaceState({}, "", "advertiser.html");
+    if (currentUser) {
+      loadAdvertiserStats();
+      loadActiveCampaigns();
+    }
+  } else if (urlParams.get("checkout") === "cancelled") {
+    showToast("Checkout cancelled.", "error");
+    history.replaceState({}, "", "advertiser.html");
+  }
+}
+
+function checkConnectReturn() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("connect") === "success") {
+    showToast("Stripe connected successfully!", "success");
+    history.replaceState({}, "", "developer.html");
+    if (currentUser) loadDevDashboard();
+  } else if (urlParams.get("connect") === "refresh") {
+    history.replaceState({}, "", "developer.html");
+  }
+}
+
 function checkPendingCheckout() {
   const pending = sessionStorage.getItem("pendingCheckout");
   if (pending) {
@@ -731,16 +792,10 @@ function checkPendingCheckout() {
       if (data.tierIndex !== undefined) selectedTierIndex = data.tierIndex;
       renderTiers();
       updateAdPreview();
-      
-    } catch (e) {}
-    sessionStorage.removeItem("pendingCheckout");
-    
-    // Check URL params for post-checkout
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("checkout") === "success") {
-      showToast("Payment successful! Campaign is now active.", "success");
-      history.replaceState({}, "", "index.html");
+    } catch {
+      /* ignore */
     }
+    sessionStorage.removeItem("pendingCheckout");
   }
 }
 

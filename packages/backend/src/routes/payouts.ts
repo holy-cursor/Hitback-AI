@@ -51,8 +51,8 @@ router.post("/connect-onboard", requireAuth, async (req: Request, res: Response)
     // Create an onboarding link
     const accountLink = await stripe.accountLinks.create({
       account: connectId,
-      refresh_url: `${portalUrl}/index.html?connect=refresh`,
-      return_url: `${portalUrl}/index.html?connect=success`,
+      refresh_url: `${portalUrl}/developer.html?connect=refresh`,
+      return_url: `${portalUrl}/developer.html?connect=success`,
       type: "account_onboarding",
     });
 

@@ -201,7 +201,13 @@ async function handleSignUpFromModal() {
     }
 
     if (data.needsConfirmation) {
+      if (errorEl) {
+        errorEl.style.display = "block";
+        errorEl.style.color = "var(--accent-green, #16a34a)";
+        errorEl.textContent = data.message || "Check your email and click the confirmation link, then sign in.";
+      }
       showToast(data.message || "Check your email to confirm your account.", "success");
+      setSignInModalMode("signin");
       return;
     }
 

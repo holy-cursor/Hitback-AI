@@ -197,6 +197,60 @@ router.post("/signup", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /auth/confirm
+ * Completes email confirmation from the link Supabase sends.
+ * Body: { token_hash: string, type: string }
+ */
+router.post("/confirm", async (req: Request, res: Response) => {
+  if (!isSupabaseConfigured()) {
+    res.status(503).json({ error: "Auth not available" });
+    return;
+  }
+
+  const { token_hash, type } = req.body;
+  if (!token_hash || !type) {
+    res.status(400).json({ error: "Missing confirmation token" });
+    return;
+  }
+
+  const allowed = new Set(["signup", "email", "invite", "magiclink", "recovery", "email_change"]);
+  if (!allowed.has(type)) {
+    res.status(400).json({ error: "Invalid confirmation type" });
+    return;
+  }
+
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb.auth.verifyOtp({
+      token_hash,
+      type: type as "signup" | "email" | "invite" | "magiclink" | "recovery" | "email_change",
+    });
+
+    if (error || !data.session || !data.user) {
+      res.status(401).json({ error: error?.message || "Invalid or expired confirmation link" });
+      return;
+    }
+
+    setAuthCookie(res, data.session.access_token);
+    await upsertUserProfile(sb, data.user);
+
+    res.json({
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name:
+          data.user.user_metadata?.full_name ||
+          data.user.email?.split("@")[0],
+      },
+      accessToken: data.session.access_token,
+    });
+  } catch (err) {
+    console.error("[Auth] Confirm error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
  * POST /auth/session
  * Exchanges a Supabase access token for a session.
  * Called by the frontend after OAuth callback.

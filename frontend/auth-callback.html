@@ -6,8 +6,8 @@
   <title>Authenticating — HitBack</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="hitback-api" content="https://hitback-api.fly.dev">
-  <script src="api-config.js?v=20260614d"></script>
-  <script src="auth.js?v=20260614d"></script>
+  <script src="api-config.js?v=20260614e"></script>
+  <script src="auth.js?v=20260614e"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="login-page">
@@ -19,14 +19,61 @@
   </main>
 
   <script>
-    (async function handleCallback() {
+    function redirectAfterAuth() {
+      const hasPending =
+        sessionStorage.getItem("pendingCheckout") ||
+        sessionStorage.getItem("autoCheckoutAfterLogin");
+      window.location.href = hasPending ? "index.html#advertisers" : "index.html";
+    }
+
+    async function finishAuth(res) {
+      const data = await res.json().catch(() => ({}));
       const statusEl = document.getElementById("status-text");
 
+      if (res.ok && data.accessToken) {
+        saveAuthToken(data.accessToken);
+        statusEl.textContent = "Success! Redirecting…";
+        redirectAfterAuth();
+        return true;
+      }
+
+      statusEl.textContent = data.error || "Authentication failed. Redirecting…";
+      setTimeout(() => { window.location.href = "index.html"; }, 2500);
+      return false;
+    }
+
+    (async function handleCallback() {
+      const statusEl = document.getElementById("status-text");
+      const api = getHitbackApi();
+
       try {
+        const query = new URLSearchParams(window.location.search);
+        const tokenHash = query.get("token_hash");
+        const confirmType = query.get("type");
+
+        if (tokenHash && confirmType) {
+          statusEl.textContent = "Confirming your email…";
+          const res = await fetch(`${api}/auth/confirm`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ token_hash: tokenHash, type: confirmType }),
+          });
+          await finishAuth(res);
+          return;
+        }
+
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const accessToken = params.get("access_token");
         const refreshToken = params.get("refresh_token");
+        const hashError = params.get("error_description") || params.get("error");
+
+        if (hashError) {
+          statusEl.textContent = decodeURIComponent(hashError.replace(/\+/g, " "));
+          setTimeout(() => { window.location.href = "index.html"; }, 3000);
+          return;
+        }
 
         if (!accessToken || !refreshToken) {
           statusEl.textContent = "Missing tokens. Redirecting…";
@@ -36,7 +83,7 @@
 
         statusEl.textContent = "Setting up session…";
 
-        const res = await fetch(`${getHitbackApi()}/auth/session`, {
+        const res = await fetch(`${api}/auth/session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -46,20 +93,7 @@
           }),
         });
 
-        const data = await res.json().catch(() => ({}));
-
-        if (res.ok && data.accessToken) {
-          saveAuthToken(data.accessToken);
-          statusEl.textContent = "Success! Redirecting…";
-          const hasPending =
-            sessionStorage.getItem("pendingCheckout") ||
-            sessionStorage.getItem("autoCheckoutAfterLogin");
-          window.location.href = hasPending ? "index.html#advertisers" : "index.html";
-          return;
-        }
-
-        statusEl.textContent = data.error || "Authentication failed. Redirecting…";
-        setTimeout(() => { window.location.href = "index.html"; }, 2000);
+        await finishAuth(res);
       } catch (err) {
         statusEl.textContent = "Network error. Redirecting…";
         console.error("[Auth Callback]", err);

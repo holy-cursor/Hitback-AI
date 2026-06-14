@@ -10,12 +10,18 @@ import ws from "ws";
  */
 
 let _client: SupabaseClient | null = null;
+let _anonClient: SupabaseClient | null = null;
 
 /**
  * Returns true if Supabase credentials are configured in the environment.
  */
 export function isSupabaseConfigured(): boolean {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+}
+
+/** Anon key required for signUp / resend confirmation emails. */
+export function isSupabaseAnonConfigured(): boolean {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
 }
 
 /**
@@ -47,4 +53,31 @@ export function getSupabase(): SupabaseClient {
   });
 
   return _client;
+}
+
+/**
+ * Public Supabase client for auth flows that send confirmation emails.
+ */
+export function getSupabaseAnon(): SupabaseClient {
+  if (_anonClient) {
+    return _anonClient;
+  }
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase anon key not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env"
+    );
+  }
+
+  _anonClient = createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return _anonClient;
 }

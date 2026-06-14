@@ -103,7 +103,11 @@ function handleLogin() {
 function openSignInModal() {
   const modal = document.getElementById("signin-modal");
   const errorEl = document.getElementById("signin-error");
-  if (errorEl) errorEl.style.display = "none";
+  if (errorEl) {
+    errorEl.style.display = "none";
+    errorEl.style.color = "";
+    errorEl.textContent = "";
+  }
   if (modal) {
     modal.classList.add("is-open");
     modal.setAttribute("aria-hidden", "false");
@@ -136,7 +140,11 @@ function setSignInModalMode(mode) {
   const signupTab = document.getElementById("signin-tab-signup");
   const errorEl = document.getElementById("signin-error");
 
-  if (errorEl) errorEl.style.display = "none";
+  if (errorEl) {
+    errorEl.style.display = "none";
+    errorEl.style.color = "";
+    errorEl.textContent = "";
+  }
 
   if (signinTab && signupTab) {
     const isSignIn = mode === "signin";
@@ -150,7 +158,7 @@ function setSignInModalMode(mode) {
   if (subtitle) {
     subtitle.textContent = mode === "signin"
       ? "Sign in to track earnings, manage campaigns, and withdraw payouts."
-      : "No confirmation email needed — you'll be signed in right away.";
+      : "We'll email you a confirmation link before you can sign in.";
   }
   if (submitBtn) submitBtn.textContent = mode === "signin" ? "Sign In" : "Create Account";
   if (passwordInput) {
@@ -173,6 +181,56 @@ document.addEventListener("keydown", (event) => {
 function handleGoogleSignIn() {
   saveFormState();
   window.location.href = `${API}/auth/google`;
+}
+
+function showConfirmationPrompt(message) {
+  const errorEl = document.getElementById("signin-error");
+  if (!errorEl) return;
+  errorEl.style.display = "block";
+  errorEl.style.color = "#059669";
+  errorEl.innerHTML = `
+    ${escapeHtml(message)}
+    <button type="button" class="link-btn" style="display:block;margin-top:8px;" onclick="handleResendConfirmation()">Resend confirmation email</button>
+  `;
+}
+
+async function handleResendConfirmation() {
+  const email = document.getElementById("signin-email")?.value.trim();
+  const errorEl = document.getElementById("signin-error");
+  if (!email) {
+    if (errorEl) {
+      errorEl.style.display = "block";
+      errorEl.style.color = "";
+      errorEl.textContent = "Enter your email above, then resend the confirmation link.";
+    }
+    return;
+  }
+
+  try {
+    const res = await apiFetch("/auth/resend-confirmation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showConfirmationPrompt(data.message || "Confirmation email sent. Check your inbox and spam folder.");
+      showToast("Confirmation email sent", "success");
+      setSignInModalMode("signin");
+      return;
+    }
+    if (errorEl) {
+      errorEl.style.display = "block";
+      errorEl.style.color = "";
+      errorEl.textContent = data.error || "Could not resend confirmation email";
+    }
+  } catch {
+    if (errorEl) {
+      errorEl.style.display = "block";
+      errorEl.style.color = "";
+      errorEl.textContent = "Network error. Please try again.";
+    }
+  }
 }
 
 async function handleEmailSignIn(event) {
@@ -198,8 +256,13 @@ async function handleEmailSignIn(event) {
 
     if (!res.ok) {
       if (errorEl) {
-        errorEl.textContent = data.error || "Sign in failed";
-        errorEl.style.display = "block";
+        errorEl.style.color = "";
+        if (data.needsConfirmation) {
+          showConfirmationPrompt(data.error || "Please confirm your email before signing in.");
+        } else {
+          errorEl.textContent = data.error || "Sign in failed";
+          errorEl.style.display = "block";
+        }
       }
       return;
     }
@@ -248,9 +311,19 @@ async function handleSignUpFromModal() {
 
     if (!res.ok) {
       if (errorEl) {
+        errorEl.style.color = "";
         errorEl.textContent = data.error || "Could not create account";
         errorEl.style.display = "block";
       }
+      return;
+    }
+
+    if (data.needsConfirmation) {
+      showConfirmationPrompt(
+        data.message || "Check your email and click the confirmation link, then sign in."
+      );
+      showToast("Confirmation email sent", "success");
+      setSignInModalMode("signin");
       return;
     }
 

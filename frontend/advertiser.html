@@ -7,12 +7,12 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="hitback-api" content="https://hitback-api.fly.dev">
   <script src="auth-redirect.js"></script>
-  <script src="cache-bust.js?v=20260615b"></script>
-  <script src="api-config.js?v=20260615b"></script>
+  <script src="cache-bust.js?v=20260615c"></script>
+  <script src="api-config.js?v=20260615c"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260615b">
+  <link rel="stylesheet" href="styles.css?v=20260615c">
 </head>
 <body data-page="advertiser">
   <nav class="nav">
@@ -21,7 +21,12 @@
         <img src="favicon.png" alt="HitBack" class="site-logo" width="32" height="32">
         <span>HitBack</span>
       </a>
-      <div class="nav-menu">
+      <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-menu" onclick="toggleNavMenu()">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <div class="nav-menu" id="nav-menu">
         <div class="nav-pages">
           <a href="index.html" class="nav-link">Home</a>
           <a href="developer.html" class="nav-link"><span class="nav-link-full">Developer Portal</span><span class="nav-link-short">Developers</span></a>
@@ -82,7 +87,7 @@
           <div class="form-group">
             <label class="form-label" for="ad-text">Ad headline <span class="required">*</span> <span class="label-hint">(max 60 chars)</span></label>
             <div class="headline-field-wrap" style="display:block;border:2px solid #64748b;border-radius:10px;background:#fff;overflow:visible;margin:8px 0 0;">
-              <input type="text" id="ad-text" name="adText" class="headline-input" placeholder="e.g. Get paid for your content — join Content Rewards" maxlength="60" required oninput="updateAdPreview()" autocomplete="off" style="display:block;width:100%;min-height:52px;padding:14px 16px;font-size:16px;line-height:1.4;color:#0f172a;background:#fff;border:none;outline:none;box-sizing:border-box;-webkit-text-fill-color:#0f172a;">
+              <input type="text" id="ad-text" name="adText" class="headline-input" placeholder="e.g. Ship faster with AI — try HitBack Pro" maxlength="60" required oninput="updateAdPreview()" autocomplete="off" style="display:block;width:100%;min-height:52px;padding:14px 16px;font-size:16px;line-height:1.4;color:#0f172a;background:#fff;border:none;outline:none;box-sizing:border-box;-webkit-text-fill-color:#0f172a;">
             </div>
             <div class="form-hint"><span id="ad-text-count">0</span>/60 characters</div>
           </div>
@@ -103,7 +108,7 @@
 
           <div class="form-group">
             <label class="form-label" for="ad-url">Destination URL <span class="required">*</span></label>
-            <input type="url" id="ad-url" name="adUrl" class="form-input" placeholder="https://contentrewards.com" required>
+            <input type="url" id="ad-url" name="adUrl" class="form-input" placeholder="https://yoursite.com" required>
           </div>
 
           <p class="form-section-title">Bidding &amp; budget</p>
@@ -175,7 +180,7 @@
   </div>
 
   <div id="toast-container" class="toast-container"></div>
-  <script src="auth.js?v=20260615b"></script>
-  <script src="app.js?v=20260615b"></script>
+  <script src="auth.js?v=20260615c"></script>
+  <script src="app.js?v=20260615c"></script>
 </body>
 </html>

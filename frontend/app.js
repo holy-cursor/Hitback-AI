@@ -15,6 +15,45 @@ function getPage() {
   return document.body.dataset.page || "home";
 }
 
+function toggleNavMenu() {
+  const menu = document.getElementById("nav-menu");
+  const toggle = document.getElementById("nav-toggle");
+  if (!menu || !toggle) return;
+  const open = menu.classList.toggle("is-open");
+  toggle.classList.toggle("is-open", open);
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+  document.body.classList.toggle("nav-open", open);
+}
+
+function closeNavMenu() {
+  const menu = document.getElementById("nav-menu");
+  const toggle = document.getElementById("nav-toggle");
+  if (!menu || !toggle) return;
+  menu.classList.remove("is-open");
+  toggle.classList.remove("is-open");
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-label", "Open menu");
+  document.body.classList.remove("nav-open");
+}
+
+document.addEventListener("click", (event) => {
+  const menu = document.getElementById("nav-menu");
+  const toggle = document.getElementById("nav-toggle");
+  if (!menu?.classList.contains("is-open")) return;
+  if (menu.contains(event.target) || toggle?.contains(event.target)) return;
+  closeNavMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeNavMenu();
+});
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest(".nav-pages .nav-link");
+  if (link) closeNavMenu();
+});
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -620,7 +659,7 @@ async function handleCreateCampaign(e) {
   }
 
   if (!adUrl) {
-    errorEl.textContent = "Add a destination URL (where clicks go), e.g. https://contentrewards.com";
+    errorEl.textContent = "Add a destination URL (where clicks go), e.g. https://yoursite.com";
     errorEl.style.display = "block";
     document.getElementById("ad-url")?.focus();
     return;

@@ -801,6 +801,13 @@ function checkPendingCheckout() {
 
 // ── Live Queue ───────────────────────────────────────────────
 
+function queueServedImpressions(c) {
+  const total = c.total_impressions || 0;
+  const remaining = c.remaining_impressions || 0;
+  if (!total) return 0;
+  return Math.max(0, total - remaining);
+}
+
 function renderQueue(campaigns) {
   const queueEl = document.getElementById("queue-list");
   if (!queueEl) return;
@@ -808,14 +815,16 @@ function renderQueue(campaigns) {
   const active = (campaigns || [])
     .filter(c => c.status === "active" && (c.remaining_impressions || 0) > 0)
     .sort((a, b) => (b.cpm_cents || 0) - (a.cpm_cents || 0))
-    .slice(0, 5); // top 5
+    .slice(0, 5);
 
   if (active.length === 0) {
     queueEl.innerHTML = `<div class="queue-empty">No active campaigns. Be the first!</div>`;
     return;
   }
 
-  queueEl.innerHTML = active.map((c, i) => `
+  queueEl.innerHTML = active.map((c, i) => {
+    const served = queueServedImpressions(c);
+    return `
     <div class="queue-item">
       <div class="q-left">
         <span class="q-rank">#${i + 1}</span>
@@ -823,10 +832,12 @@ function renderQueue(campaigns) {
       </div>
       <div class="q-right">
         <span class="q-bid">$${((c.cpm_cents || 0) / 100).toFixed(2)} CPM</span>
+        <span class="q-served">${served.toLocaleString()} served</span>
         <span class="q-rem">${(c.remaining_impressions || 0).toLocaleString()} left</span>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 let queueInterval;
@@ -846,9 +857,9 @@ async function fetchQueue() {
 
 function showDemoQueue() {
   const demoCampaigns = [
-    { ad_text: "Try Acme Pro — 50% off today", cpm_cents: 800, remaining_impressions: 4200, status: 'active' },
-    { ad_text: "Ship faster with Turbo CI/CD", cpm_cents: 500, remaining_impressions: 1100, status: 'active' },
-    { ad_text: "DevTools Premium — free trial", cpm_cents: 400, remaining_impressions: 8900, status: 'active' }
+    { ad_text: "Try Acme Pro — 50% off today", cpm_cents: 800, total_impressions: 5000, remaining_impressions: 4200, status: "active" },
+    { ad_text: "Ship faster with Turbo CI/CD", cpm_cents: 500, total_impressions: 2000, remaining_impressions: 1100, status: "active" },
+    { ad_text: "DevTools Premium — free trial", cpm_cents: 400, total_impressions: 10000, remaining_impressions: 8900, status: "active" },
   ];
   renderQueue(demoCampaigns);
 }

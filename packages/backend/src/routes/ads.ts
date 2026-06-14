@@ -103,7 +103,7 @@ router.get("/queue", async (_req: Request, res: Response) => {
 
     const { data: campaigns, error } = await sb
       .from("campaigns")
-      .select("ad_text, cpm_cents, remaining_impressions, status")
+      .select("ad_text, cpm_cents, total_impressions, remaining_impressions, status")
       .eq("status", "active")
       .gt("remaining_impressions", 0)
       .order("cpm_cents", { ascending: false })

@@ -77,6 +77,9 @@ export function getSupabaseAnon(): SupabaseClient {
       autoRefreshToken: false,
       persistSession: false,
     },
+    realtime: {
+      transport: ws as any,
+    },
   });
 
   return _anonClient;

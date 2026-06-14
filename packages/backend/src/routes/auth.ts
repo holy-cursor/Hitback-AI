@@ -2,8 +2,31 @@ import { Router, Request, Response } from "express";
 import { isSupabaseConfigured, getSupabase } from "../lib/supabase";
 import { getPortalUrl } from "../lib/portalUrl";
 import { extractAuthToken } from "../lib/resolveUser";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const router = Router();
+
+async function findUserIdByEmail(
+  sb: SupabaseClient,
+  email: string
+): Promise<string | null> {
+  const target = email.trim().toLowerCase();
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 100 });
+    if (error || !data.users.length) break;
+    const match = data.users.find((u) => u.email?.toLowerCase() === target);
+    if (match) return match.id;
+    if (data.users.length < 100) break;
+  }
+  return null;
+}
+
+async function confirmUserEmail(sb: SupabaseClient, email: string): Promise<boolean> {
+  const userId = await findUserIdByEmail(sb, email);
+  if (!userId) return false;
+  const { error } = await sb.auth.admin.updateUserById(userId, { email_confirm: true });
+  return !error;
+}
 
 function setAuthCookie(res: Response, accessToken: string): void {
   const isProd = process.env.NODE_ENV === "production";
@@ -100,7 +123,17 @@ router.post("/login", async (req: Request, res: Response) => {
 
   try {
     const sb = getSupabase();
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    let { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (
+      error?.message?.toLowerCase().includes("email not confirmed") ||
+      error?.message?.toLowerCase().includes("email_not_confirmed")
+    ) {
+      const confirmed = await confirmUserEmail(sb, email);
+      if (confirmed) {
+        ({ data, error } = await sb.auth.signInWithPassword({ email, password }));
+      }
+    }
 
     if (error || !data.session || !data.user) {
       res.status(401).json({ error: error?.message || "Invalid email or password" });
@@ -160,10 +193,34 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     if (createError) {
       const msg = createError.message || "Could not create account";
-      const status = msg.toLowerCase().includes("already") ? 409 : 400;
-      res.status(status).json({
-        error: status === 409 ? "An account with this email already exists. Try signing in." : msg,
-      });
+      const alreadyExists = msg.toLowerCase().includes("already");
+      if (alreadyExists) {
+        const confirmed = await confirmUserEmail(sb, email);
+        if (confirmed) {
+          const { data: signInData, error: signInError } = await sb.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (!signInError && signInData.session && signInData.user) {
+            setAuthCookie(res, signInData.session.access_token);
+            await upsertUserProfile(sb, signInData.user);
+            res.json({
+              user: {
+                id: signInData.user.id,
+                email: signInData.user.email,
+                name: signInData.user.email?.split("@")[0],
+              },
+              accessToken: signInData.session.access_token,
+            });
+            return;
+          }
+        }
+        res.status(409).json({
+          error: "An account with this email already exists. Try signing in.",
+        });
+        return;
+      }
+      res.status(400).json({ error: msg });
       return;
     }
 

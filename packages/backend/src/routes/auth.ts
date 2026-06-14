@@ -151,18 +151,31 @@ router.post("/signup", async (req: Request, res: Response) => {
 
   try {
     const sb = getSupabase();
-    const { data, error } = await sb.auth.signUp({ email, password });
 
-    if (error || !data.user) {
-      res.status(400).json({ error: error?.message || "Could not create account" });
+    const { data: created, error: createError } = await sb.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (createError) {
+      const msg = createError.message || "Could not create account";
+      const status = msg.toLowerCase().includes("already") ? 409 : 400;
+      res.status(status).json({
+        error: status === 409 ? "An account with this email already exists. Try signing in." : msg,
+      });
       return;
     }
 
-    if (!data.session) {
-      res.json({
-        needsConfirmation: true,
-        message: "Check your email to confirm your account, then sign in.",
-      });
+    if (!created.user) {
+      res.status(400).json({ error: "Could not create account" });
+      return;
+    }
+
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (error || !data.session || !data.user) {
+      res.status(500).json({ error: "Account created but sign-in failed. Try signing in." });
       return;
     }
 

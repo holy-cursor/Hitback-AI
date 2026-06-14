@@ -641,6 +641,15 @@ async function handleCreateCampaign(e) {
   btn.textContent = "Checkout securely with Stripe";
 }
 
+function isPreviewImageUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function updateAdPreview() {
   const preview = document.getElementById("ad-preview");
   const previewText = document.getElementById("ad-preview-text");
@@ -657,7 +666,7 @@ function updateAdPreview() {
   previewText.textContent = text || "Your headline appears here";
 
   if (previewImage) {
-    if (imageUrl) {
+    if (imageUrl && isPreviewImageUrl(imageUrl)) {
       previewImage.src = imageUrl;
       previewImage.style.display = "block";
       previewImage.onerror = () => {

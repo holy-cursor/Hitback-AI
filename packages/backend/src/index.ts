@@ -77,9 +77,9 @@ app.listen(PORT, "0.0.0.0", () => {
   ╚══════════════════════════════════════════╝
   `);
   console.log("  Routes:");
-  console.log("    GET  /api/ads/current          — fetch ad");
-  console.log("    POST /api/impressions          — record impression");
-  console.log("    POST /api/clicks               — report click");
+  console.log("    GET  /api/ads/current          — fetch ad + serve tokens");
+  console.log("    POST /api/impressions          — record impression (token required)");
+  console.log("    POST /api/clicks               — report click (token required)");
   console.log("    GET  /auth/google              — OAuth login");
   console.log("    GET  /auth/me                  — current user");
   console.log("    POST /api/billing/checkout      — Stripe checkout");

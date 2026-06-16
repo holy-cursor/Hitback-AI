@@ -22,7 +22,7 @@ router.post("/detect-anomalies", requireAdmin, async (_req: Request, res: Respon
     // 1. Fetch all impressions in the last 24 hours
     const { data: recentImpressions, error: fetchError } = await sb
       .from("impressions")
-      .select("extension_user_id")
+      .select("extension_user_id, auth_user_id")
       .gte("shown_at", oneDayAgo);
 
     if (fetchError || !recentImpressions) {
@@ -35,10 +35,13 @@ router.post("/detect-anomalies", requireAdmin, async (_req: Request, res: Respon
       return;
     }
 
-    // 2. Count impressions per user
+    // 2. Count impressions per identity (auth user when logged in, else install ID)
     const userCounts: Record<string, number> = {};
     for (const imp of recentImpressions) {
-      userCounts[imp.extension_user_id] = (userCounts[imp.extension_user_id] || 0) + 1;
+      const identity = imp.auth_user_id
+        ? `auth:${imp.auth_user_id}`
+        : `anon:${imp.extension_user_id}`;
+      userCounts[identity] = (userCounts[identity] || 0) + 1;
     }
 
     // 3. Calculate Global Average
@@ -53,14 +56,18 @@ router.post("/detect-anomalies", requireAdmin, async (_req: Request, res: Respon
 
     // 4. Flag the users
     let flaggedCount = 0;
-    for (const userId of anomalousUsers) {
+    for (const identity of anomalousUsers) {
+      const extensionUserId = identity.startsWith("anon:")
+        ? identity.slice(5)
+        : identity;
+
       const { error: flagError } = await sb.from("fraud_flags").insert({
-        extension_user_id: userId,
-        reason: `Generated ${userCounts[userId]} impressions in 24h. Global avg was ${globalAverage.toFixed(1)}.`,
+        extension_user_id: extensionUserId,
+        reason: `Identity ${identity} generated ${userCounts[identity]} impressions in 24h. Global avg was ${globalAverage.toFixed(1)}.`,
       });
 
       if (flagError) {
-        console.error(`[Admin] Failed to flag user ${userId}:`, flagError.message);
+        console.error(`[Admin] Failed to flag user ${identity}:`, flagError.message);
       } else {
         flaggedCount++;
       }

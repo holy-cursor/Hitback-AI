@@ -24,15 +24,32 @@ async function enrichCampaignsWithStats(
   const ids = campaigns.map((c) => c.id);
 
   const [{ data: impressionRows }, { data: clickRows }] = await Promise.all([
-    sb.from("impressions").select("campaign_id").in("campaign_id", ids),
+    sb
+      .from("impressions")
+      .select("campaign_id, auth_user_id, extension_user_id")
+      .in("campaign_id", ids),
     sb.from("clicks").select("campaign_id").in("campaign_id", ids),
   ]);
 
   const impressionCounts: Record<string, number> = {};
   const clickCounts: Record<string, number> = {};
+  const verifiedReach: Record<string, Set<string>> = {};
+  const anonymousReach: Record<string, Set<string>> = {};
 
   for (const row of impressionRows || []) {
     impressionCounts[row.campaign_id] = (impressionCounts[row.campaign_id] || 0) + 1;
+
+    if (row.auth_user_id) {
+      if (!verifiedReach[row.campaign_id]) {
+        verifiedReach[row.campaign_id] = new Set();
+      }
+      verifiedReach[row.campaign_id].add(row.auth_user_id);
+    } else {
+      if (!anonymousReach[row.campaign_id]) {
+        anonymousReach[row.campaign_id] = new Set();
+      }
+      anonymousReach[row.campaign_id].add(row.extension_user_id);
+    }
   }
   for (const row of clickRows || []) {
     clickCounts[row.campaign_id] = (clickCounts[row.campaign_id] || 0) + 1;
@@ -45,12 +62,17 @@ async function enrichCampaignsWithStats(
     const ctr =
       impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + "%" : "0.00%";
     const spendCents = Math.round((delivered * (c.cpm_cents || 0)) / 1000);
+    const verifiedDevelopers = verifiedReach[c.id]?.size || 0;
+    const anonymousInstalls = anonymousReach[c.id]?.size || 0;
 
     return {
       ...c,
       delivered_impressions: delivered,
       impression_count: impressions,
       click_count: clicks,
+      verified_unique_developers: verifiedDevelopers,
+      anonymous_unique_installs: anonymousInstalls,
+      unique_reach: verifiedDevelopers + anonymousInstalls,
       ctr,
       spend_cents: spendCents,
       spend_display: formatCents(spendCents),

@@ -59,10 +59,12 @@ router.post("/stripe", async (req: Request, res: Response) => {
         console.log(`[Webhooks] Unhandled event type: ${event.type}`);
     }
   } catch (err) {
-    console.error(`[Webhooks] Error handling ${event.type}:`, err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error(`[Webhooks] Error handling ${event.type}:`, message);
+    res.status(500).json({ error: "Webhook handler failed" });
+    return;
   }
 
-  // Always return 200 to acknowledge receipt
   res.json({ received: true });
 });
 
@@ -72,7 +74,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleCheckoutComplete(session: any): Promise<void> {
   if (!isSupabaseConfigured()) {
-    return;
+    throw new Error("Supabase not configured — cannot activate campaign");
   }
 
   const campaignId = session.metadata?.campaignId;
@@ -80,13 +82,11 @@ async function handleCheckoutComplete(session: any): Promise<void> {
   const userId = session.metadata?.userId;
 
   if (!campaignId || !impressions) {
-    console.error("[Webhooks] Missing metadata in checkout session");
-    return;
+    throw new Error("Missing campaignId or impressions in checkout session metadata");
   }
 
   const sb = getSupabase();
 
-  // Activate the campaign and credit impressions
   const { error } = await sb
     .from("campaigns")
     .update({
@@ -98,16 +98,18 @@ async function handleCheckoutComplete(session: any): Promise<void> {
     .eq("id", campaignId);
 
   if (error) {
-    console.error("[Webhooks] Campaign activation error:", error.message);
-    return;
+    throw new Error(`Campaign activation failed: ${error.message}`);
   }
 
-  // If we have a customer ID and userId, save stripe_customer_id
   if (session.customer && userId) {
-    await sb
+    const { error: profileError } = await sb
       .from("user_profiles")
       .update({ stripe_customer_id: session.customer as string })
       .eq("id", userId);
+
+    if (profileError) {
+      console.error("[Webhooks] Profile stripe_customer_id update error:", profileError.message);
+    }
   }
 
   console.log(

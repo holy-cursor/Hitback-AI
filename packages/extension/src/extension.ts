@@ -4,7 +4,6 @@ import { CursorAgentDetector } from "./adapters/cursorDetector";
 import { AdPanel } from "./panel/adPanel";
 import {
   fetchCurrentAd,
-  OFFLINE_FALLBACK_AD,
   reportClick,
   reportImpression,
 } from "./ads/adClient";
@@ -13,13 +12,10 @@ import { randomUUID } from "crypto";
 import { AuthService } from "./auth/authService";
 
 import { RateLimiter } from "./ads/rateLimiter";
-import { DEFAULT_BACKEND_URL } from "./config";
+import { DEFAULT_BACKEND_URL, PANEL_COOLDOWN_MS } from "./config";
 
 function getBackendUrl(): string {
-  return (
-    vscode.workspace.getConfiguration("hitback").get<string>("backendUrl") ||
-    DEFAULT_BACKEND_URL
-  );
+  return DEFAULT_BACKEND_URL;
 }
 
 /**
@@ -72,8 +68,10 @@ function collectWatchRoots(context: vscode.ExtensionContext): string[] {
     }
   }
 
-  // Extension dev fallback: watch the hitback repo root
-  roots.add(path.resolve(context.extensionPath, "..", ".."));
+  // Dev only — never watch ~/.cursor in production installs
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    roots.add(path.resolve(context.extensionPath, "..", ".."));
+  }
 
   return [...roots];
 }
@@ -89,7 +87,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await authService.initialize();
 
   // Register Auth Commands
-  const loginCommand = vscode.commands.registerCommand("hitback.login", () => authService.login());
+  const loginCommand = vscode.commands.registerCommand("hitback.login", () =>
+    authService.promptSignIn()
+  );
   const logoutCommand = vscode.commands.registerCommand("hitback.logout", () => authService.logout());
   context.subscriptions.push(loginCommand, logoutCommand);
 
@@ -97,88 +97,249 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return;
   }
 
+  const output = vscode.window.createOutputChannel("HitBack");
+  const log = (message: string): void => {
+    output.appendLine(message);
+    console.log(message);
+  };
+
   const detector = new CursorAgentDetector(watchRoots, IGNORED_DOC_SCHEMES);
   const adPanel = new AdPanel();
   const extensionUserId = getOrCreateUserId(context);
   const rateLimiter = RateLimiter.getInstance(context);
 
-  // --- Agent Start: fetch and show an ad ---
-  const startListener = detector.onAgentStart(async () => {
-    if (!rateLimiter.canShowAd()) {
-      console.log("[HitBack] Rate limit reached. Skipping ad fetch for this burst.");
+  let showInFlight = false;
+  let lastRetryAt = 0;
+  let lastAdShownAt = 0;
+  let lastAuthPromptAt = 0;
+
+  const AUTH_PROMPT_COOLDOWN_MS = 60_000;
+
+  function isAuthError(error?: string): boolean {
+    if (!error) {
+      return false;
+    }
+    const lower = error.toLowerCase();
+    return error.includes("HTTP 401") || lower.includes("sign in required");
+  }
+
+  async function handleAuthFailure(source: string, error?: string): Promise<void> {
+    log(`[HitBack] Sign-in required (${source}): ${error ?? "session expired"}`);
+    await authService.clearSession();
+
+    const now = Date.now();
+    if (now - lastAuthPromptAt < AUTH_PROMPT_COOLDOWN_MS) {
+      return;
+    }
+    lastAuthPromptAt = now;
+    void authService.promptSignIn();
+  }
+
+  function getCooldownRemainingMs(): number {
+    if (lastAdShownAt === 0) {
+      return 0;
+    }
+    return Math.max(0, PANEL_COOLDOWN_MS - (Date.now() - lastAdShownAt));
+  }
+
+  function promptLoginIfNeeded(): void {
+    void authService.promptSignIn();
+  }
+
+  async function showAdFromBurst(reason: string): Promise<void> {
+    if (showInFlight) {
       return;
     }
 
-    const backendUrl = getBackendUrl();
+    if (!authService.isAuthenticated()) {
+      log(`[HitBack] Sign-in required. Skipping: ${reason}`);
+      return;
+    }
 
-    const token = authService.getToken() || undefined;
-    const fetchedAd = await fetchCurrentAd(backendUrl, token);
-    const ad = fetchedAd ?? OFFLINE_FALLBACK_AD;
-    const usedFallback = !fetchedAd;
+    const cooldownRemaining = getCooldownRemainingMs();
+    if (cooldownRemaining > 0) {
+      log(
+        `[HitBack] Cooldown active (${Math.ceil(cooldownRemaining / 1000)}s left). Skipping: ${reason}`
+      );
+      return;
+    }
 
-    if (detector.isActive) {
-      adPanel.show(ad);
-      rateLimiter.recordImpression();
+    if (!rateLimiter.canShowAd()) {
+      log(
+        `[HitBack] Rate limit reached (${rateLimiter.getImpressionCount()}/${rateLimiter.getLimit()} this hour). Skipping: ${reason}`
+      );
+      return;
+    }
+    if (adPanel.isOpen()) {
+      return;
+    }
 
-      console.log(
-        `[HitBack] Ad panel opened: "${ad.text}" (id: ${ad.id}${usedFallback ? ", offline fallback" : ""})`
+    showInFlight = true;
+    try {
+      const backendUrl = getBackendUrl();
+      const token = authService.getToken() || undefined;
+      const { ad: fetchedAd, error } = await fetchCurrentAd(
+        backendUrl,
+        extensionUserId,
+        token
       );
 
-      if (!usedFallback) {
-        reportImpression(backendUrl, ad.id, extensionUserId, token);
+      if (!fetchedAd) {
+        log(`[HitBack] Ad fetch failed (${reason}): ${error ?? "unknown error"}`);
+        log(`[HitBack] Backend URL: ${backendUrl}`);
+        if (isAuthError(error)) {
+          await handleAuthFailure(reason, error);
+        }
+        return;
       }
+
+      adPanel.show(fetchedAd);
+
+      log(
+        `[HitBack] Ad panel opened (${reason}): "${fetchedAd.text}" (id: ${fetchedAd.id})`
+      );
+
+      const impResult = await reportImpression(
+        backendUrl,
+        fetchedAd.impressionToken!,
+        token
+      );
+
+      if (!impResult.ok) {
+        log(`[HitBack] Impression report failed: ${impResult.error ?? "unknown error"}`);
+        if (isAuthError(impResult.error)) {
+          await handleAuthFailure("impression", impResult.error);
+        }
+        adPanel.hide();
+        return;
+      }
+
+      rateLimiter.recordImpression();
+      lastAdShownAt = Date.now();
+      log(
+        `[HitBack] Impression recorded. Cooldown started (${PANEL_COOLDOWN_MS / 1000}s until next ad)`
+      );
+    } finally {
+      showInFlight = false;
     }
+  }
+
+  // --- Agent Start: fetch and show an ad ---
+  const startListener = detector.onAgentStart(() => {
+    void showAdFromBurst("agent-start");
   });
 
   const stopListener = detector.onAgentStop(() => {
     adPanel.hide();
-    console.log("[HitBack] Agent stopped — ad panel closed");
+    log("[HitBack] Agent stopped — ad panel closed");
+  });
+
+  // Retry if agent is active but the panel never opened (rate limit race, missed burst, etc.)
+  const docEditRetry = vscode.workspace.onDidChangeTextDocument((e) => {
+    if (IGNORED_DOC_SCHEMES.has(e.document.uri.scheme)) {
+      return;
+    }
+    if (!detector.isActive || adPanel.isOpen()) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastRetryAt < 3000) {
+      return;
+    }
+    lastRetryAt = now;
+    log("[HitBack] Agent active, panel closed — retrying ad show after doc edit");
+    void showAdFromBurst("doc-edit-retry");
   });
 
   const clickCommand = vscode.commands.registerCommand(
     "hitback.adClick",
     async () => {
+      const token = authService.getToken() || undefined;
       const ad = adPanel.getAd();
-      if (!ad) {
+      if (!ad?.clickToken) {
         return;
       }
 
-      console.log(`[HitBack] Ad clicked: "${ad.text}" → ${ad.url}`);
+      log(`[HitBack] Ad clicked: "${ad.text}" → ${ad.url}`);
 
       const backendUrl = getBackendUrl();
-
-      const token = authService.getToken() || undefined;
-      reportClick(backendUrl, ad.id, extensionUserId, token);
+      const clickResult = await reportClick(backendUrl, ad.clickToken, token);
+      if (!clickResult.ok) {
+        log(`[HitBack] Click report failed: ${clickResult.error ?? "unknown error"}`);
+      }
     }
   );
 
   const testCommand = vscode.commands.registerCommand(
     "hitback.testAd",
     async () => {
-      console.log("[HitBack:Test] Manually triggering ad fetch...");
+      if (!authService.isAuthenticated()) {
+        promptLoginIfNeeded();
+        return;
+      }
+
+      log("[HitBack:Test] Manually triggering ad fetch...");
+      output.show(true);
+
       const backendUrl = getBackendUrl();
-
       const token = authService.getToken() || undefined;
-      const fetchedAd = await fetchCurrentAd(backendUrl, token);
-      const ad = fetchedAd ?? OFFLINE_FALLBACK_AD;
-      const usedFallback = !fetchedAd;
+      const { ad: fetchedAd, error } = await fetchCurrentAd(
+        backendUrl,
+        extensionUserId,
+        token
+      );
 
-      adPanel.show(ad);
-      vscode.window.showInformationMessage(
-        `[HitBack] Ad: "${ad.text}"${usedFallback ? " (offline fallback)" : ""}`
+      if (!fetchedAd) {
+        log(`[HitBack:Test] Ad fetch failed: ${error ?? "unknown error"}`);
+        log(`[HitBack:Test] Backend URL: ${backendUrl}`);
+        if (isAuthError(error)) {
+          await handleAuthFailure("test-ad", error);
+          return;
+        }
+        void vscode.window.showErrorMessage(
+          `HitBack: could not fetch ad — ${error ?? "check Output → HitBack"}`
+        );
+        return;
+      }
+
+      adPanel.show(fetchedAd);
+      log(`[HitBack:Test] Panel shown — "${fetchedAd.text}"`);
+      log(
+        `[HitBack:Test] Agent ads this hour: ${rateLimiter.getImpressionCount()}/${rateLimiter.getLimit()} (Test Ad does not count)`
+      );
+      void vscode.window.showInformationMessage(
+        `HitBack: ad panel opened beside your editor — tab "Sponsored"`
       );
     }
   );
 
+  const resetLimitCommand = vscode.commands.registerCommand(
+    "hitback.resetRateLimit",
+    async () => {
+      await rateLimiter.reset();
+      log("[HitBack] Rate limit counter reset.");
+      void vscode.window.showInformationMessage("HitBack: rate limit reset — agent ads can show again.");
+    }
+  );
+
   context.subscriptions.push(
+    output,
     clickCommand,
     testCommand,
+    resetLimitCommand,
     stopListener,
     startListener,
+    docEditRetry,
     detector
   );
 
-  console.log(`[HitBack] Extension activated — user: ${extensionUserId.slice(0, 8)}…`);
+  if (authService.isAuthenticated()) {
+    log(`[HitBack] Extension activated — signed in, user: ${extensionUserId.slice(0, 8)}…`);
+  } else {
+    log("[HitBack] Extension activated — sign in required before ads show");
+    promptLoginIfNeeded();
+  }
 }
 
 export function deactivate(): void {

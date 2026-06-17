@@ -1,0 +1,9 @@
+# Whitelist only files shipped in the VSIX
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!icon.png
+!out/**
+!out/**/**

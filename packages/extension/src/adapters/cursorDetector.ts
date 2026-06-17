@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
+import { PANEL_DISPLAY_MS } from "../config";
 
 /**
  * Detects agent activity using EVERY available signal.
@@ -22,7 +23,7 @@ export class CursorAgentDetector implements vscode.Disposable {
   private watchedRoots = new Set<string>();
   private eventCount = 0;
 
-  private static readonly KEEP_ALIVE_MS = 15000;
+  private static readonly KEEP_ALIVE_MS = PANEL_DISPLAY_MS;
 
   constructor(
     private readonly initialWatchRoots: string[] = [],
@@ -35,7 +36,7 @@ export class CursorAgentDetector implements vscode.Disposable {
       vscode.workspace.onDidChangeTextDocument((e) => {
         const { scheme, fsPath } = e.document.uri;
         if (!this.ignoredDocSchemes.has(scheme)) {
-          this.handleEvent(`doc-edit: ${this.label(e.document.uri)}`);
+          this.handleEvent(`doc-edit: ${this.label(e.document.uri)}`, true);
         }
         if (scheme === "file") {
           this.addWatchRoot(path.dirname(fsPath));
@@ -67,7 +68,7 @@ export class CursorAgentDetector implements vscode.Disposable {
     this.disposables.push(
       vscode.workspace.onDidCreateFiles((e) => {
         for (const f of e.files) {
-          this.handleEvent(`api-create: ${this.label(f)}`);
+          this.handleEvent(`api-create: ${this.label(f)}`, true);
           if (f.scheme === "file") {
             this.addWatchRoot(path.dirname(f.fsPath));
           }
@@ -77,29 +78,29 @@ export class CursorAgentDetector implements vscode.Disposable {
     this.disposables.push(
       vscode.workspace.onDidSaveTextDocument((doc) => {
         if (doc.uri.scheme === "file") {
-          this.handleEvent(`save: ${this.label(doc.uri)}`);
+          this.handleEvent(`save: ${this.label(doc.uri)}`, true);
         }
       })
     );
     this.disposables.push(
       vscode.workspace.onDidDeleteFiles((e) => {
         for (const f of e.files) {
-          this.handleEvent(`api-delete: ${this.label(f)}`);
+          this.handleEvent(`api-delete: ${this.label(f)}`, false);
         }
       })
     );
 
-    // ── Signal 4: Editor / terminal activity ──
+    // ── Signal 4: Editor / terminal activity (keep-alive only) ──
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor(() => {
         if (this.agentActive) {
-          this.handleEvent("editor-switch");
+          this.handleEvent("editor-switch", false);
         }
       })
     );
     this.disposables.push(
       vscode.window.onDidOpenTerminal(() => {
-        this.handleEvent("terminal-open");
+        this.handleEvent("terminal-open", false);
       })
     );
   }
@@ -117,22 +118,25 @@ export class CursorAgentDetector implements vscode.Disposable {
     );
 
     watcher.onDidChange((uri) => {
-      this.handleEvent(`fs-change: ${this.label(uri)}`);
+      this.handleEvent(`fs-change: ${this.label(uri)}`, false);
     });
     watcher.onDidCreate((uri) =>
-      this.handleEvent(`fs-create: ${this.label(uri)}`)
+      this.handleEvent(`fs-create: ${this.label(uri)}`, false)
     );
     watcher.onDidDelete((uri) =>
-      this.handleEvent(`fs-delete: ${this.label(uri)}`)
+      this.handleEvent(`fs-delete: ${this.label(uri)}`, false)
     );
 
     this.fileWatchers.push(watcher);
   }
 
-  private handleEvent(label: string): void {
+  private handleEvent(label: string, canStartBurst: boolean): void {
     const filtered =
       label.includes("node_modules") ||
       label.includes(".git") ||
+      label.includes(".cursor") ||
+      label.includes("\\extensions\\") ||
+      label.includes("/extensions/") ||
       label.includes("debug-2150e3.log") ||
       label.includes("\\out\\") ||
       label.includes("/out/") ||
@@ -145,12 +149,15 @@ export class CursorAgentDetector implements vscode.Disposable {
     this.eventCount++;
 
     if (!this.agentActive) {
+      if (!canStartBurst) {
+        return;
+      }
       this.agentActive = true;
       this.eventCount = 1;
-      console.log(`[HitBack] 🚀 ${label} — SHOWING AD`);
+      console.log(`[HitBack] 🚀 ${label} — agent burst started`);
       this._onAgentStart.fire();
     } else if (this.eventCount % 10 === 0) {
-      console.log(`[HitBack] ...${this.eventCount} events (ad still showing)`);
+      console.log(`[HitBack] ...${this.eventCount} events (agent still active)`);
     }
 
     if (this.stopTimer) {

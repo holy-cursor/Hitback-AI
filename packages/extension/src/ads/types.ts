@@ -8,4 +8,6 @@ export interface Ad {
   text: string;
   url: string;
   imageUrl?: string;
+  impressionToken?: string;
+  clickToken?: string;
 }

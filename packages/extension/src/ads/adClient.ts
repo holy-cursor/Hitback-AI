@@ -5,31 +5,43 @@ import { Ad } from "./types";
  * Handles fetching ads, reporting impressions, and reporting clicks.
  */
 
-/** Timeout for all backend requests (ms). */
-const REQUEST_TIMEOUT_MS = 3000;
+/** Timeout for ad fetch (backend can be slow on cold start). */
+const FETCH_TIMEOUT_MS = 20_000;
+const REPORT_TIMEOUT_MS = 5_000;
 
-/**
- * Fetch the current ad from the backend.
- * Returns null if the request fails or no ad is available.
- */
-/** Shown when the backend is unreachable (matches backend demo ads). */
-export const OFFLINE_FALLBACK_AD: Ad = {
-  id: "offline-demo",
-  text: "Try Acme Pro — 50% off today",
-  url: "https://example.com/acme-pro",
-};
+/** Header carrying the persistent anonymous install ID. */
+const USER_ID_HEADER = "X-HitBack-User-Id";
 
-export async function fetchCurrentAd(backendUrl: string, token?: string): Promise<Ad | null> {
+export interface FetchAdResult {
+  ad: Ad | null;
+  error?: string;
+}
+
+export interface ReportResult {
+  ok: boolean;
+  error?: string;
+}
+
+export async function fetchCurrentAd(
+  backendUrl: string,
+  extensionUserId: string,
+  token?: string
+): Promise<FetchAdResult> {
+  const url = `${backendUrl.replace(/\/$/, "")}/api/ads/current`;
+
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const headers: Record<string, string> = { "Accept": "application/json" };
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      [USER_ID_HEADER]: extensionUserId,
+    };
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${backendUrl}/api/ads/current`, {
+    const response = await fetch(url, {
       signal: controller.signal,
       headers,
     });
@@ -37,81 +49,99 @@ export async function fetchCurrentAd(backendUrl: string, token?: string): Promis
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return null;
+      let detail = "";
+      try {
+        const body = (await response.json()) as { error?: string };
+        detail = body.error ? `: ${body.error}` : "";
+      } catch {
+        // ignore parse errors
+      }
+      return { ad: null, error: `HTTP ${response.status}${detail}` };
     }
 
     const data = (await response.json()) as Ad;
 
-    if (!data || !data.id || !data.text || !data.url) {
-      return null;
+    if (!data?.id || !data.text || !data.url) {
+      return { ad: null, error: "Invalid ad payload from backend" };
     }
 
-    return data;
-  } catch {
-    return null;
+    if (!data.impressionToken) {
+      return {
+        ad: null,
+        error: "Backend response missing impressionToken (update the extension)",
+      };
+    }
+
+    return { ad: data };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return {
+        ad: null,
+        error: `Request timed out after ${FETCH_TIMEOUT_MS / 1000}s (${url})`,
+      };
+    }
+    return { ad: null, error: `Network error (${url})` };
   }
 }
 
-/**
- * Report an ad impression to the backend.
- * Fire-and-forget — errors are silently ignored.
- */
+async function postReport(
+  path: string,
+  backendUrl: string,
+  body: Record<string, string>,
+  token?: string
+): Promise<ReportResult> {
+  const url = `${backendUrl.replace(/\/$/, "")}${path}`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const payload = (await response.json()) as { error?: string };
+        detail = payload.error ? `: ${payload.error}` : "";
+      } catch {
+        // ignore parse errors
+      }
+      return { ok: false, error: `HTTP ${response.status}${detail}` };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return { ok: false, error: `Request timed out after ${REPORT_TIMEOUT_MS / 1000}s` };
+    }
+    return { ok: false, error: `Network error (${url})` };
+  }
+}
+
 export async function reportImpression(
   backendUrl: string,
-  campaignId: string,
-  extensionUserId: string,
+  impressionToken: string,
   token?: string
-): Promise<void> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    await fetch(`${backendUrl}/api/impressions`, {
-      method: "POST",
-      signal: controller.signal,
-      headers,
-      body: JSON.stringify({ campaignId, extensionUserId }),
-    });
-
-    clearTimeout(timeout);
-  } catch {
-    // Fire and forget
-  }
+): Promise<ReportResult> {
+  return postReport("/api/impressions", backendUrl, { impressionToken }, token);
 }
 
-/**
- * Report an ad click to the backend.
- * Fire-and-forget — errors are silently ignored.
- */
 export async function reportClick(
   backendUrl: string,
-  adId: string,
-  extensionUserId?: string,
+  clickToken: string,
   token?: string
-): Promise<void> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    await fetch(`${backendUrl}/api/clicks`, {
-      method: "POST",
-      signal: controller.signal,
-      headers,
-      body: JSON.stringify({ adId, extensionUserId }),
-    });
-
-    clearTimeout(timeout);
-  } catch {
-    // Fire and forget
-  }
+): Promise<ReportResult> {
+  return postReport("/api/clicks", backendUrl, { clickToken }, token);
 }

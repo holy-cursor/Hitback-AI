@@ -1,15 +1,38 @@
 {
   "name": "hitback-extension",
   "displayName": "HitBack — AI Wait State Ads",
-  "description": "Shows sponsored ads while Cursor's agent is working",
-  "version": "0.5.0",
+  "description": "Earn from sponsored ads shown while Cursor's AI agent is working. 60% revenue share for developers.",
+  "version": "0.5.14",
   "publisher": "hitback",
+  "license": "MIT",
+  "icon": "icon.png",
+  "homepage": "https://hitback.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/holy-cursor/Hitback-AI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/holy-cursor/Hitback-AI/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "cursor",
+    "ai",
+    "ads",
+    "earnings",
+    "agent",
+    "copilot",
+    "monetization"
+  ],
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -21,26 +44,25 @@
         "title": "HitBack: Open Ad Link"
       },
       {
-        "command": "hitback.testAd",
-        "title": "HitBack: Test Ad (Debug)"
-      },
-      {
         "command": "hitback.login",
         "title": "HitBack: Login"
       },
       {
         "command": "hitback.logout",
         "title": "HitBack: Logout"
+      },
+      {
+        "command": "hitback.testAd",
+        "title": "HitBack: Test Ad"
+      },
+      {
+        "command": "hitback.resetRateLimit",
+        "title": "HitBack: Reset Rate Limit"
       }
     ],
     "configuration": {
       "title": "HitBack",
       "properties": {
-        "hitback.backendUrl": {
-          "type": "string",
-          "default": "https://api.hitback.xyz",
-          "description": "URL of the HitBack ad server backend"
-        },
         "hitback.enabled": {
           "type": "boolean",
           "default": true,
@@ -53,11 +75,13 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
-    "package": "npx @vscode/vsce package"
+    "package": "npm run compile && npx @vscode/vsce package --no-dependencies",
+    "publish:marketplace": "npm run compile && npx @vscode/vsce publish --no-dependencies",
+    "publish:openvsx": "npm run compile && npx ovsx publish"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
     "typescript": "^5.4.0"
   }
 }

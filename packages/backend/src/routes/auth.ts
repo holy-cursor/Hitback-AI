@@ -4,6 +4,7 @@ import {
   isSupabaseAnonConfigured,
   getSupabase,
   getSupabaseAnon,
+  getSupabaseOAuth,
 } from "../lib/supabase";
 import { getPortalUrl } from "../lib/portalUrl";
 import { extractAuthToken } from "../lib/resolveUser";
@@ -74,8 +75,15 @@ router.get("/google", async (req: Request, res: Response) => {
     return;
   }
 
+  if (!isSupabaseAnonConfigured()) {
+    res.status(503).json({
+      error: "Google sign-in not configured. Set SUPABASE_ANON_KEY on the server.",
+    });
+    return;
+  }
+
   try {
-    const sb = getSupabase();
+    const sb = getSupabaseOAuth();
     const context = req.query.context as string;
     const editor =
       context === "cursor" ? "cursor" : context === "vscode" ? "vscode" : undefined;
@@ -345,6 +353,53 @@ router.post("/confirm", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[Auth] Confirm error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /auth/exchange-code
+ * PKCE fallback — exchange OAuth code when Supabase returns ?code= instead of hash tokens.
+ */
+router.post("/exchange-code", async (req: Request, res: Response) => {
+  if (!isSupabaseAnonConfigured()) {
+    res.status(503).json({ error: "Auth not available" });
+    return;
+  }
+
+  const { code } = req.body;
+  if (!code || typeof code !== "string") {
+    res.status(400).json({ error: "Missing OAuth code" });
+    return;
+  }
+
+  try {
+    const anon = getSupabaseAnon();
+    const { data, error } = await anon.auth.exchangeCodeForSession(code);
+
+    if (error || !data.session || !data.user) {
+      console.error("[Auth] OAuth code exchange failed:", error?.message);
+      res.status(401).json({ error: error?.message || "Invalid or expired OAuth code" });
+      return;
+    }
+
+    setAuthCookie(res, data.session.access_token);
+    await upsertUserProfile(getSupabase(), data.user);
+
+    console.log(`[Auth] OAuth code exchange for: ${data.user.email}`);
+
+    res.json({
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name:
+          data.user.user_metadata?.full_name ||
+          data.user.email?.split("@")[0],
+      },
+      accessToken: data.session.access_token,
+    });
+  } catch (err) {
+    console.error("[Auth] Exchange code error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

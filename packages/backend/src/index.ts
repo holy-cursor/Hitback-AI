@@ -81,6 +81,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("    POST /api/impressions          — record impression (token required)");
   console.log("    POST /api/clicks               — report click (token required)");
   console.log("    GET  /auth/google              — OAuth login");
+  console.log("    POST /auth/exchange-code       — OAuth PKCE code exchange");
   console.log("    GET  /auth/me                  — current user");
   console.log("    POST /api/billing/checkout      — Stripe checkout");
   console.log("    GET  /api/billing/tiers         — pricing tiers");

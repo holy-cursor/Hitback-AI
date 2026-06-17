@@ -11,6 +11,7 @@ import ws from "ws";
 
 let _client: SupabaseClient | null = null;
 let _anonClient: SupabaseClient | null = null;
+let _oauthClient: SupabaseClient | null = null;
 
 /**
  * Returns true if Supabase credentials are configured in the environment.
@@ -83,4 +84,36 @@ export function getSupabaseAnon(): SupabaseClient {
   });
 
   return _anonClient;
+}
+
+/**
+ * Anon client with implicit OAuth flow — returns tokens in the callback URL hash
+ * (required for our static auth-callback.html; PKCE codes cannot be exchanged server-side).
+ */
+export function getSupabaseOAuth(): SupabaseClient {
+  if (_oauthClient) {
+    return _oauthClient;
+  }
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase anon key not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env"
+    );
+  }
+
+  _oauthClient = createClient(url, key, {
+    auth: {
+      flowType: "implicit",
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    realtime: {
+      transport: ws as any,
+    },
+  });
+
+  return _oauthClient;
 }

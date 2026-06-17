@@ -63,6 +63,26 @@
           return;
         }
 
+        const oauthCode = query.get("code");
+        const queryError = query.get("error_description") || query.get("error");
+        if (queryError) {
+          statusEl.textContent = decodeURIComponent(queryError.replace(/\+/g, " "));
+          setTimeout(() => { window.location.href = "index.html"; }, 3000);
+          return;
+        }
+
+        if (oauthCode) {
+          statusEl.textContent = "Setting up session…";
+          const res = await fetch(`${api}/auth/exchange-code`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ code: oauthCode }),
+          });
+          await finishAuth(res);
+          return;
+        }
+
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const accessToken = params.get("access_token");

@@ -33,20 +33,44 @@
 
   <script>
     /**
-     * VS Code OAuth Callback Handler
-     *
-     * Supabase redirects here with tokens in the URL hash.
-     * We extract the access token and trigger a VS Code deep link.
+     * VS Code / Cursor OAuth callback — tokens in URL hash (implicit) or ?code= (PKCE).
      */
-    (function handleVSCodeCallback() {
+    (async function handleVSCodeCallback() {
       const statusEl = document.getElementById("status-text");
       const manualActionEl = document.getElementById("manual-action");
       const openBtn = document.getElementById("open-vscode-btn");
+      const api = getHitbackApi();
 
       try {
+        const query = new URLSearchParams(window.location.search);
+        const queryError = query.get("error_description") || query.get("error");
+        if (queryError) {
+          statusEl.textContent = decodeURIComponent(queryError.replace(/\+/g, " "));
+          statusEl.style.color = "red";
+          return;
+        }
+
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
-        const accessToken = params.get("access_token");
+        let accessToken = params.get("access_token");
+
+        const oauthCode = query.get("code");
+        if (!accessToken && oauthCode) {
+          statusEl.textContent = "Completing sign-in…";
+          const res = await fetch(`${api}/auth/exchange-code`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ code: oauthCode }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.accessToken) {
+            statusEl.textContent = data.error || "Authentication failed. No token received.";
+            statusEl.style.color = "red";
+            return;
+          }
+          accessToken = data.accessToken;
+        }
 
         if (!accessToken) {
           statusEl.textContent = "Authentication failed. No token received.";
@@ -54,11 +78,10 @@
           return;
         }
 
-        // Deep link for VS Code and Cursor (same extension ID)
         const vscodeLink = `vscode://hitback.hitback-extension/auth-callback?token=${encodeURIComponent(accessToken)}`;
         const cursorLink = `cursor://hitback.hitback-extension/auth-callback?token=${encodeURIComponent(accessToken)}`;
 
-        const preferredEditor = new URLSearchParams(window.location.search).get("editor");
+        const preferredEditor = query.get("editor");
         const primaryLink = preferredEditor === "vscode" ? vscodeLink : cursorLink;
         const fallbackLink = preferredEditor === "vscode" ? cursorLink : vscodeLink;
 
@@ -67,17 +90,14 @@
           setTimeout(() => { window.location.href = fallbackLink; }, 600);
         }
 
-        // Try preferred editor first, then the other (browsers can't detect scheme success)
         openDeepLinks();
 
-        // Show manual button just in case the browser blocks automatic deep links
         setTimeout(() => {
           manualActionEl.style.display = "block";
           statusEl.textContent = "You can safely close this browser tab.";
         }, 1500);
 
         openBtn.addEventListener("click", openDeepLinks);
-
       } catch (err) {
         statusEl.textContent = "An error occurred during authentication.";
         console.error(err);

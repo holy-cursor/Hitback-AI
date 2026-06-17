@@ -1,0 +1,12 @@
+# HitBack backend — Railway deployment
+# Docs: https://docs.railway.com/guides/monorepo
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build --workspace=packages/backend"
+
+[deploy]
+startCommand = "npm run start --workspace=packages/backend"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"

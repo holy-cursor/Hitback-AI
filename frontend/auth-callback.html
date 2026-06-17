@@ -66,8 +66,17 @@
         const oauthCode = query.get("code");
         const queryError = query.get("error_description") || query.get("error");
         if (queryError) {
-          statusEl.textContent = decodeURIComponent(queryError.replace(/\+/g, " "));
-          setTimeout(() => { window.location.href = "index.html"; }, 3000);
+          const decoded = decodeURIComponent(queryError.replace(/\+/g, " "));
+          if (decoded.toLowerCase().includes("unable to exchange external code")) {
+            statusEl.innerHTML =
+              "Google sign-in is not configured correctly in Supabase. " +
+              "In Google Cloud Console, set the redirect URI to " +
+              "<code style='font-size:12px;word-break:break-all'>https://xphquzpxialjgrqgtpss.supabase.co/auth/v1/callback</code> " +
+              "and paste the same Client ID + Secret into Supabase → Authentication → Providers → Google.";
+          } else {
+            statusEl.textContent = decoded;
+          }
+          setTimeout(() => { window.location.href = "index.html"; }, 8000);
           return;
         }
 

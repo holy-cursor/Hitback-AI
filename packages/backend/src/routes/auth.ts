@@ -6,7 +6,7 @@ import {
   getSupabaseAnon,
   getSupabaseOAuth,
 } from "../lib/supabase";
-import { getPortalUrl } from "../lib/portalUrl";
+import { getPortalUrl, resolvePortalUrl } from "../lib/portalUrl";
 import { extractAuthToken } from "../lib/resolveUser";
 
 const router = Router();
@@ -88,7 +88,7 @@ router.get("/google", async (req: Request, res: Response) => {
     const editor =
       context === "cursor" ? "cursor" : context === "vscode" ? "vscode" : undefined;
 
-    const portalUrl = getPortalUrl();
+    const portalUrl = resolvePortalUrl(req);
     let redirectTo = `${portalUrl}/auth-callback.html`;
 
     if (context === "vscode" || context === "cursor") {
@@ -99,7 +99,13 @@ router.get("/google", async (req: Request, res: Response) => {
 
     const { data, error } = await sb.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo },
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
     });
 
     if (error || !data.url) {

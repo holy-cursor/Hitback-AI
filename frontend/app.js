@@ -180,7 +180,8 @@ document.addEventListener("keydown", (event) => {
 
 function handleGoogleSignIn() {
   saveFormState();
-  window.location.href = `${API}/auth/google`;
+  const origin = encodeURIComponent(window.location.origin);
+  window.location.href = `${API}/auth/google?origin=${origin}`;
 }
 
 function showConfirmationPrompt(message) {

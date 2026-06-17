@@ -897,3 +897,47 @@ body.modal-open { overflow: hidden; }
   .form-hint { font-size: 12px; }
   .q-served, .q-rem { font-size: 12px; }
 }
+
+/* --- SEO landing (Cursor / AI keywords) --- */
+.container--wide { max-width: 800px; }
+.seo-hero { margin-bottom: 48px; }
+.seo-section { margin-bottom: 64px; scroll-margin-top: 80px; }
+.seo-section .section-title { text-align: center; }
+.seo-lead { text-align: left; max-width: 100%; margin: 0 0 28px; line-height: 1.65; }
+.seo-lead a { color: var(--color-blue); font-weight: 600; text-decoration: none; }
+.seo-lead a:hover { text-decoration: underline; }
+.seo-feature-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+.seo-feature-card { padding: 24px; }
+.seo-feature-title {
+  font-size: 16px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.01em;
+}
+.seo-feature-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.55; }
+.seo-steps {
+  max-width: 100%; margin: 0; padding-left: 1.25rem;
+  color: var(--text-secondary); font-size: 15px; line-height: 1.65;
+}
+.seo-steps li { margin-bottom: 12px; }
+.seo-steps strong { color: var(--text-primary); }
+.seo-section--dark { margin-bottom: 64px; }
+.seo-cta-card { padding: 40px 32px; text-align: center; }
+.seo-faq .section-title { margin-bottom: 28px; }
+.seo-faq-list { max-width: 100%; }
+.seo-faq-item {
+  padding: 20px 0; border-bottom: 1px solid var(--border-light);
+}
+.seo-faq-item:first-child { padding-top: 0; }
+.seo-faq-item:last-child { border-bottom: none; padding-bottom: 0; }
+.seo-faq-item dt { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+.seo-faq-item dd { font-size: 15px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
+.seo-faq-item dd a { color: var(--color-blue); font-weight: 600; text-decoration: none; }
+.seo-faq-item dd a:hover { text-decoration: underline; }
+.seo-related { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; }
+.seo-related a { color: var(--text-secondary); text-decoration: none; font-weight: 500; }
+.seo-related a:hover { color: var(--text-primary); text-decoration: underline; }
+
+@media (max-width: 700px) {
+  .seo-feature-grid { grid-template-columns: 1fr; }
+  .seo-cta-card { padding: 28px 20px; }
+}

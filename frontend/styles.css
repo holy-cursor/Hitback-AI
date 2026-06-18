@@ -180,7 +180,13 @@ body {
 }
 .portal-page { padding-top: 24px; padding-bottom: 48px; }
 .portal-section { margin-bottom: 0; }
-.portal-cta-row { margin-bottom: 24px; }
+.portal-cta-row {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
 
 .user-profile {
   display: flex; align-items: center; gap: 12px;

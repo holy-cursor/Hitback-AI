@@ -481,7 +481,7 @@ function renderEarningsHistory(entries, container) {
   if (!container) return;
 
   if (!entries.length) {
-    container.innerHTML = `<div class="earnings-empty">No earnings yet. Install the extension and run your AI agent to start earning.</div>`;
+    container.innerHTML = `<div class="earnings-empty">No earnings yet. Install HitBack in Cursor and run your AI agent to start earning.</div>`;
     return;
   }
 

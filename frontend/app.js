@@ -178,12 +178,6 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-function handleGoogleSignIn() {
-  saveFormState();
-  const origin = encodeURIComponent(window.location.origin);
-  window.location.href = `${API}/auth/google?origin=${origin}`;
-}
-
 function showConfirmationPrompt(message) {
   const errorEl = document.getElementById("signin-error");
   if (!errorEl) return;

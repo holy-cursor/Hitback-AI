@@ -51,7 +51,7 @@ export class AuthService implements vscode.UriHandler {
   }
 
   /**
-   * Explain why sign-in is required, then let the user choose how to sign in.
+   * Explain why sign-in is required, then prompt for email sign-in.
    */
   public async promptSignIn(): Promise<void> {
     const proceed = await vscode.window.showInformationMessage(
@@ -65,66 +65,12 @@ export class AuthService implements vscode.UriHandler {
       return;
     }
 
-    await this.showSignInOptions();
+    await this.loginWithEmail();
   }
 
   /** Entry point for HitBack: Login command and post-prompt flow. */
   public async login(): Promise<void> {
-    await this.showSignInOptions();
-  }
-
-  private async showSignInOptions(): Promise<void> {
-    const choice = await vscode.window.showQuickPick(
-      [
-        {
-          label: "$(globe) Continue with Google",
-          description: "Opens your browser to complete sign-in",
-          id: "google",
-        },
-        {
-          label: "$(mail) Sign in with email",
-          description: "Use your HitBack email and password",
-          id: "email",
-        },
-      ],
-      {
-        title: "Sign in to HitBack",
-        placeHolder: "Choose how you want to sign in",
-        ignoreFocusOut: true,
-      }
-    );
-
-    if (!choice) {
-      return;
-    }
-
-    if (choice.id === "google") {
-      await this.loginWithGoogle();
-      return;
-    }
-
-    if (choice.id === "email") {
-      await this.loginWithEmail();
-    }
-  }
-
-  private async loginWithGoogle(): Promise<void> {
-    const backendUrl = this.getBackendUrl();
-    const appName = vscode.env.appName.toLowerCase();
-    const editor = appName.includes("cursor") ? "cursor" : "vscode";
-    const loginUrl = vscode.Uri.parse(`${backendUrl}/auth/google?context=${editor}`);
-
-    console.log(`[Auth] Initiating Google login: ${loginUrl.toString()}`);
-
-    const success = await vscode.env.openExternal(loginUrl);
-    if (!success) {
-      void vscode.window.showErrorMessage("Failed to open browser for Google sign-in.");
-      return;
-    }
-
-    void vscode.window.showInformationMessage(
-      "Complete Google sign-in in your browser, then return to the editor."
-    );
+    await this.loginWithEmail();
   }
 
   private async loginWithEmail(): Promise<void> {
